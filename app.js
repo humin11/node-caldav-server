@@ -5,8 +5,11 @@ var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 
+require('babel-core/register');
+
 var routes = require('./routes/index');
 var users = require('./routes/users');
+require("./routes/test");
 
 var app = express();
 

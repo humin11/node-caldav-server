@@ -9,7 +9,8 @@ require('babel-core/register');
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
-require("./routes/test");
+
+require('./dao/db');
 
 var app = express();
 

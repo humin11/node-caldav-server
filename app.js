@@ -9,6 +9,8 @@ require('babel-core/register');
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
+var calendars = require('./routes/calendars');
+var principles = require('./routes/principles');
 
 require('./dao/db');
 
@@ -28,6 +30,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', routes);
 app.use('/users', users);
+app.use('/calendars',calendars);
+app.use('/principles',principles);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

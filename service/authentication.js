@@ -1,4 +1,4 @@
-var log = require('../utils/log');
+import log from '../utils/log'
 import { USER } from '../dao/db'
 
 function authentication(username, password, callback) {

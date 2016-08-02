@@ -36,14 +36,6 @@ let CAL = sequelize.define('CAL', {
     synctoken: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 }
 });
 
-let VCARD = sequelize.define('VCARD', {
-    pkey: { type: Sequelize.STRING, allowNull: false, unique: true, primaryKey: true },
-    ownerId: { type: Sequelize.STRING, allowNull: false },
-    addressbookId: { type: Sequelize.STRING, allowNull: false },
-    content: { type: Sequelize.TEXT, allowNull: false },
-    is_group: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false }
-});
-
 (async () => {
     try {
         await sequelize.sync({ 
@@ -60,6 +52,5 @@ module.exports = {
     USER: USER,
     ICS: ICS,
     CAL: CAL,
-    VCARD: VCARD,
     sequelize: sequelize
 }

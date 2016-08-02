@@ -25,7 +25,7 @@ var basic = httpauth.basic({
         authentication(username,password,callback);
     }
 );
-app.use(httpauth.connect(basic));
+
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -39,6 +39,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use(httpauth.connect(basic));
 
 app.use('/',principles);
 app.use('/calendars',calendars);

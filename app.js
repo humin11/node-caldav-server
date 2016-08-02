@@ -7,14 +7,25 @@ var bodyParser = require('body-parser');
 
 require('babel-core/register');
 
+var log = require('./utils/log');
 var routes = require('./routes/index');
-var users = require('./routes/users');
 var calendars = require('./routes/calendars');
-var principles = require('./routes/principles');
+var principles = require('./routes/principals');
 
 require('./dao/db');
 
 var app = express();
+
+var httpauth = require('http-auth'); 
+var authentication = require('./service/authentication');
+var basic = httpauth.basic({
+        realm: "Caldav"
+    }, function (username, password, callback) { 
+        log.info('begin check');
+        authentication(username,password,callback);
+    }
+);
+app.use(httpauth.connect(basic));
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -28,10 +39,10 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', routes);
-app.use('/users', users);
+
+app.use('/',principles);
 app.use('/calendars',calendars);
-app.use('/principles',principles);
+
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

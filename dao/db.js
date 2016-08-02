@@ -4,8 +4,18 @@ import log from '../utils/log'
 
 let sequelize = new Sequelize(config.databaseName, null, null, {
     dialect: config.databaseType,
-    logging: log.info,
+    logging: function(info){
+        if(info)
+            log.info(info);
+        else
+            log.info("Not catch info");
+    },
     storage: config.databaseFile
+});
+
+let USER = sequelize.define('USER', {
+    username: {type: Sequelize.STRING,allowNull: false},
+    password: {type: Sequelize.STRING,allowNull: false,}
 });
 
 let ICS = sequelize.define('ICS', {
@@ -34,16 +44,11 @@ let VCARD = sequelize.define('VCARD', {
     is_group: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false }
 });
 
-let ADDRESSBOOK = sequelize.define('ADB', {
-    pkey: { type: Sequelize.STRING, allowNull: false, unique: true, primaryKey: true },
-    ownerId: { type: Sequelize.STRING, allowNull: false },
-    name: { type: Sequelize.STRING, allowNull: false },
-    synctoken: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 }
-});
-
 (async () => {
     try {
-        await sequelize.sync();
+        await sequelize.sync({ 
+            // force: true 
+        });
         log.info("database structure updated")
     } catch (err) {
         log.error("Database structure update crashed: " + error);
@@ -52,9 +57,9 @@ let ADDRESSBOOK = sequelize.define('ADB', {
 
 
 module.exports = {
+    USER: USER,
     ICS: ICS,
     CAL: CAL,
     VCARD: VCARD,
-    ADB: ADDRESSBOOK,
     sequelize: sequelize
 }

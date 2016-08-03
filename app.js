@@ -42,7 +42,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(httpauth.connect(basic));
 
 app.use('/',principles);
-app.use('/calendars',calendars);
+app.use('/p',principles);
+app.use('/cal',calendars);
 
 
 // catch 404 and forward to error handler

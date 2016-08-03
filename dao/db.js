@@ -8,7 +8,7 @@ let sequelize = new Sequelize(config.databaseName, null, null, {
         if(info)
             log.info(info);
         else
-            log.info("Not catch info");
+            log.error("No info catched");
     },
     storage: config.databaseFile
 });
@@ -39,7 +39,7 @@ let CAL = sequelize.define('CAL', {
 (async () => {
     try {
         await sequelize.sync({ 
-            // force: true 
+            force: config.shouldTruncateAllTables 
         });
         log.info("database structure updated")
     } catch (err) {

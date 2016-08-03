@@ -1,8 +1,12 @@
-import db from './db';
+import db from './db'
+import log from '../utils/log'
 
 export default {
     handlePropfind: function (req, res, next) {
-        res.json(req.method);
+        // res.json(req.method);
+        log.debug(req.rawBody);
+        log.debug(req.params);
+        res.status(200).end();
     },
     handleProppatch: function (req, res, next) {
         res.json(req.method);

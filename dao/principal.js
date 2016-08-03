@@ -18,7 +18,10 @@ function handlePropfind(req,res,next){
 
     res.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
 
-    var body = req.body;
+    var body = req.rawBody;
+
+    log.debug(body);
+
     var xmlDoc = xml.parseXml(body);
 
     var node = xmlDoc.get('/A:propfind/A:prop', {
@@ -164,7 +167,9 @@ function handleReport(req,res,next){
 
     res.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
 
-    var body = req.body;
+    var body = req.rawBody;
+
+    log.debug(body);
 
     var xmlDoc = xml.parseXml(body);
 
@@ -235,7 +240,7 @@ function handleReport(req,res,next){
 }
 
 function isReportPropertyCalendarProxyWriteFor(request){
-    var body = request.body;
+    var body = request.rawBody;
     var xmlDoc = xml.parseXml(body);
 
     var node = xmlDoc.get('/A:expand-property/A:property[@name=\'calendar-proxy-write-for\']', { A: 'DAV:', C: 'http://calendarserver.org/ns/'});
@@ -244,7 +249,7 @@ function isReportPropertyCalendarProxyWriteFor(request){
 }
 
 function replyPropertyCalendarProxyWriteFor(req,res,next){
-    var body = req.body;
+    var body = req.rawBody;
     res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">\r\n");
     res.write("<d:response>");
     res.write("    <d:href>" + url + "</d:href>");

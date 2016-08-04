@@ -48,9 +48,9 @@ let CAL = sequelize.define('CAL', {
 })();
 
 
-module.exports = {
-    USER: USER,
-    ICS: ICS,
-    CAL: CAL,
-    sequelize: sequelize
+export default {
+    USER,
+    ICS,
+    CAL,
+    sequelize,
 }

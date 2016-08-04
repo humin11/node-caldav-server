@@ -1,6 +1,7 @@
 import db from './db';
 import log from '../utils/log'
 import xml from 'libxmljs'
+import helper from '../conf/caldavHelper'
 
 export default {
     handlePropfind,
@@ -12,10 +13,9 @@ export default {
 function handlePropfind(req,res,next){
     log.debug("principal.propfind called");
 
-    res.set("Content-Type", "application/xml; charset=utf-8");
-    res.set("Server", "Caldav");
-    res.set("DAV", "1, 3, extended-mkcol, calendar-access, calendar-schedule, calendar-proxy, calendarserver-sharing, calendarserver-subscribed, addressbook, access-control, calendarserver-principal-property-search");
-
+    helper.setStandardHeaders(res);
+    helper.setDAVHeaders(res);
+    
     res.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
 
     var body = req.rawBody;
@@ -161,9 +161,7 @@ function getCalendarUserAddressSet(req){
 function handleReport(req,res,next){
     log.debug("principal.report called");
 
-    res.set("Content-Type", "application/xml; charset=utf-8");
-    res.set("Server", "Caldav");
-
+    helper.setStandardHeaders(res);
 
     res.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
 
@@ -312,10 +310,9 @@ function handleProppatch(req,res,next){
 function handleOptions(req,res,next){
     log.debug("principal.options called");
 
-    res.set("Content-Type", "text/html");
-    res.set("Server", "Caldav");
-    res.set("DAV", "1, 3, extended-mkcol, calendar-access, calendar-schedule, calendar-proxy, calendarserver-sharing, calendarserver-subscribed, addressbook, access-control, calendarserver-principal-property-search");
-    res.set("Allow", "OPTIONS, PROPFIND, HEAD, GET, REPORT, PROPPATCH, PUT, DELETE, POST, COPY, MOVE, MKCALENDAR");
+    helper.setStandardHeaders(res);
+    helper.setDAVHeaders(res);
+    helper.setAllowHeader(res);
 
     res.status(200).end();
 }

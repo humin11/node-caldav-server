@@ -4,12 +4,13 @@ import log from '../utils/log'
 
 let sequelize = new Sequelize(config.databaseName, null, null, {
     dialect: config.databaseType,
-    logging: function(info){
-        if(info)
-            log.info(info);
-        else
-            log.error("No info catched");
-    },
+    // logging: function(info){
+    //     if(info)
+    //         log.info(info);
+    //     else
+    //         log.error("No info catched");
+    // },
+    logging: false,
     storage: config.databaseFile
 });
 
@@ -20,7 +21,7 @@ let USER = sequelize.define('USER', {
 
 let ICS = sequelize.define('ICS', {
     pkey: {type: Sequelize.STRING, allowNull: false, unique: true, primaryKey: true,},
-    calendarID: {type: Sequelize.STRING,allowNull: false},
+    calendarId: {type: Sequelize.STRING,allowNull: false},
     content: {type: Sequelize.TEXT,allowNull: false,}
 });
 

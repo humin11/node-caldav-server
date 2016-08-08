@@ -1,21 +1,23 @@
 import log from '../utils/log'
-import { USER } from '../dao/db'
+import obj from '../dao/db'
 
 function authentication(username, password, callback) {
     log.info(`Login process started for user: ${username}`);
-    log.info(`USER: ${USER}`);
+
+    var USER = obj.USER;
+
+    log.info(USER);
+
+
 
     USER.findOrCreate({ 
         where: { username:username,password:password },
         defaults: { username:username,password:password }, 
     }).spread(function(user, created) {
         if(!user) {
+            log.error(`can't find user and can't create!`);
             callback(false);
         }else{
-            log.info(user.get({
-                plain: true
-            }));
-            log.info(`created: ${created}`);
             callback(true);
         }
     }).catch(function(err){

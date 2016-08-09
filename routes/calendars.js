@@ -28,6 +28,10 @@ router.options('/:username/:calendar_id', function (req, res, next) {
   calendarHandler.handleOptions(req, res, next);
 });
 
+router.options('/:username', function (req, res, next) {
+  calendarHandler.handleOptions(req, res, next);
+});
+
 router.report('/:username/:calendar_id/:ics_id', function (req, res, next) {
   calendarHandler.handleReport(req, res, next);
 });

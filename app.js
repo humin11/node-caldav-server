@@ -21,7 +21,6 @@ var authentication = require('./service/authentication');
 var basic = httpauth.basic({
         realm: "Caldav"
     }, function (username, password, callback) { 
-        log.info('begin check');
         authentication(username,password,callback);
     }
 );

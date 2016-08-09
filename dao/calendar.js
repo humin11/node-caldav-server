@@ -45,18 +45,22 @@ function handlePropfind(req, res, next){
     var isRoot = true;
     var username = req.params.username;
     var calendar_id = req.params.calendar_id || username;
+    calendar_id = calendar_id.split('.')[0];
+    
     var ics_id = req.params.ics_id || calendar_id;
+
+    log.error(`url: ${req.url}`)
 
     // if last element === username, then get all calendar info of user, otherwise only from that specific calendar
     //var lastelement = request.getLastPathElement();
 
-    // if URL element size === 4, this is a call for the root URL of a user.
+    // if URL element size === 3, this is a call for the root URL of a user.
     // TODO:
 
-    if(req.url.split("/").length > 4){
+    if(req.url.split("/").length > 3){
         isRoot = false;
     }else if(req.url === "/"){
-        response += "<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">";
+        response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
 
         var len = childs.length;
         for (var i=0; i < len; ++i){
@@ -64,31 +68,31 @@ function handlePropfind(req, res, next){
             var name = child.name();
             switch(name){
                 case 'calendar-free-busy-set':
-                    response += "<d:response><d:href>/</d:href></d:response>";
+                    response += "<response><href>/</href></response>";
                     break;
 
                 case 'current-user-principal':
-                    response += "<d:response><d:href>/</d:href>";
-                    response += "<d:propstat><d:prop><d:current-user-principal><d:href>/p/" + username + "/</d:href></d:current-user-principal></d:prop>";
-                    response += "<d:status>HTTP/1.1 200 OK</d:status>";
-                    response += "</d:propstat>";
-                    response += "</d:response>";
+                    response += "<response><href>/</href>";
+                    response += "<propstat><prop><current-user-principal><href>/p/" + username + "/</href></current-user-principal></prop>";
+                    response += "<status>HTTP/1.1 200 OK</status>";
+                    response += "</propstat>";
+                    response += "</response>";
                     break;
 
                 case 'principal-collection-set':
-                    response += "<d:principal-collection-set><d:href>/p/</d:href></d:principal-collection-set>";
+                    response += "<principal-collection-set><href>/p/</href></principal-collection-set>";
                     break;
             }
         }
 
-        response += "</d:multistatus>";
+        response += "</multistatus>";
         res.write(response);
         res.status(207).end();
         return;
     }
 
     if(isRoot === true){
-        log.error('is root true');
+        log.error('isRoot: true');
         var nodeChecksum = xmlDoc.get('/A:propfind/A:prop/C:checksum-versions', {   A: 'DAV:',
             B: "urn:ietf:params:xml:ns:caldav",
             C: 'http://calendarserver.org/ns/',
@@ -97,35 +101,46 @@ function handlePropfind(req, res, next){
         });
 
         if(nodeChecksum !== undefined){
-            response += "<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">";
-            response += "<d:response><d:href>/cal" + "/"+ req.params.username+"/" + calendar_id+"/" + "</d:href></d:response>";
-            response += "</d:multistatus>";
+            response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
+            response += "<response><href>/cal" + "/"+ req.params.username+"/" + calendar_id+"/" + "</href></response>";
+            response += "</multistatus>";
             res.write(response);
-            log.error(`1response: ${response}`)
+            log.error(`1response:`)
             res.status(207).end();
         }else{
             // first get the root node info
-            response += "<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">";
-            response += getCalendarRootNodeResponse(req, res, next, childs);
+            response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
+            // response += getCalendarRootNodeResponse(req, res, next, childs);
 
             // then add info for all further known calendars of same user
-            var query = { where: {owner: username}, order: [['order', 'ASC']] };
+            var query = { where: { owner: username}, order: [['order', 'ASC']] };
 
             CAL.findAndCountAll(query).then(function(result){
 
                 for (var i=0; i < result.count; ++i){
-                    var calendar = result.rows[i];
-                    response += returnCalendar(req, res, next, calendar, childs);
+                        var calendar = result.rows[i];
+                        if(calendar.pkey == calendar_id){
+                            log.debug('found root calendar')
+                            var isRoot = true;
+                            var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
+                            response +=returnedCalendar;
+                        }else{
+                            var isRoot = false;
+                            var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
+                                response +=returnedCalendar;
+                        }
                 }
 
-                response += returnOutbox(req, res, next);
-                response += returnNotifications(req, res, next);
+                // response += returnOutbox(req, res, next);
+                // response += returnNotifications(req, res, next);
 
-                response += "</d:multistatus>";
+                response += "</multistatus>";
                 res.write(response);
-                log.error(`2response: ${response}`)
+                log.error(`2response`)
                 res.status(207).end();
             });
+
+
         }
     }else{
         log.error('is root false');
@@ -135,10 +150,10 @@ function handlePropfind(req, res, next){
            /*response += returnNotifications(req,res,next);
            res.write(response);*/
 
-            res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">");
-            res.write("<d:response><d:href>/cal" + "/"+ req.params.username+"/"+req.params.calendar_id+"/" + "</d:href>");
-            res.write("</d:response>");
-            res.write("</d:multistatus>");
+            res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">");
+            res.write("<response><href>/cal" + "/"+ req.params.username+"/"+req.params.calendar_id+"/" + "</href>");
+            res.write("</response>");
+            res.write("</multistatus>");
 
             res.status(207).end();
         }else if(calendar_id === "outbox"){
@@ -198,29 +213,33 @@ END:VCALENDAR`;
                             }
 
                             cal.save().then(function(){
-                                log.warn('cal saved');
-                                response += returnPropfindElements(req, res, next, cal, childs);
 
-                                res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">");
-                                res.write("<d:response><d:href>/cal" + "/"+ req.params.username+"/"+calendar_id+"/" + "</d:href>");
+                                response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
+                                // response += getCalendarRootNodeResponse(req, res, next, childs);
 
-                                if(response.length > 0){
-                                    res.write("<d:propstat>");
-                                    res.write("<d:prop>");
+                                // then add info for all further known calendars of same user
+                                var query = { where: {owner: username}, order: [['order', 'ASC']] };
+
+                                CAL.findAndCountAll(query).then(function(result){
+
+                                    for (var i=0; i < result.count; ++i){
+                                        var calendar = result.rows[i];
+                                        if(calendar.pkey == calendar_id){
+                                            log.debug('found root calendar')
+                                            var isRoot = true;
+                                            var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
+                                            response +=returnedCalendar;
+                                        }
+                                    }
+
+                                    // response += returnOutbox(req, res, next);
+                                    // response += returnNotifications(req, res, next);
+
+                                    response += "</multistatus>";
                                     res.write(response);
-                                    res.write("</d:prop>");
-                                    res.write("<d:status>HTTP/1.1 200 OK</d:status>");
-                                    res.write("</d:propstat>");
-                                }
-
-                                res.write("</d:response>");
-                                res.write("</d:multistatus>");
-
-                                createDefaultICS(req,res,next,ics_id);
-
-                                log.debug('propfind over');
-
-                                res.status(207).end();
+                                    log.error(`2response`)
+                                    res.status(207).end();
+                                });
 
                             });
              
@@ -231,23 +250,24 @@ END:VCALENDAR`;
                     // for every ICS element, return the props...
                     response += returnPropfindElements(req, res, next, cal, childs);
 
-                    res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">");
-                    res.write("<d:response><d:href>/cal" + "/"+ req.params.username+"/"+calendar_id+"/" + "</d:href>");
+                    res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">");
+                    res.write("<response><href>/cal" + "/"+ req.params.username+"/"+calendar_id+"/" + "</href>");
 
                     if(response.length > 0){
-                        res.write("<d:propstat>");
-                        res.write("<d:prop>");
+                        res.write("<propstat>");
+                        res.write("<prop>");
                         res.write(response);
-                        res.write("</d:prop>");
-                        res.write("<d:status>HTTP/1.1 200 OK</d:status>");
-                        res.write("</d:propstat>");
+                        res.write("</prop>");
+                        res.write("<status>HTTP/1.1 200 OK</status>");
+                        res.write("</propstat>");
                     }
 
-                    res.write("</d:response>");
-                    res.write("</d:multistatus>");
+                    res.write("</response>");
+                    res.write("</multistatus>");
+                    log.debug('propfind over');
+                    res.status(207).end();
                 }
-                log.debug('propfind over');
-                res.status(207).end();
+
             });
         }
     }
@@ -289,12 +309,21 @@ function createDefaultICS(req,res,next,ics_name){
 
 }
 
-function returnPropfindElements(req, res, next, calendar, childs){
+function returnPropfindElements(req, res, next, calendar, childs, isRoot, tempArr){
     var response = "";
+
+    if(typeof isRoot == "undefined"){
+        isRoot = false;
+    }
+
+    tempArr = tempArr || [];
 
     var username = req.params.username;
 
     var token = calendar.synctoken;
+
+    var len = childs.length;
+    var date = Date.parse(calendar.updatedAt);
 
     var len = childs.length;
     for (var i=0; i < len; ++i){
@@ -306,7 +335,7 @@ function returnPropfindElements(req, res, next, calendar, childs){
                 break;
 
             case 'allowed-sharing-modes':
-                response += "<cs:allowed-sharing-modes><cs:can-be-shared/><cs:can-be-published/></cs:allowed-sharing-modes>";
+                response += "<CS:allowed-sharing-modes><CS:can-be-shared/><CS:can-be-published/></CS:allowed-sharing-modes>";
                 break;
 
             case 'autoprovisioned':
@@ -337,7 +366,7 @@ function returnPropfindElements(req, res, next, calendar, childs){
                 var timezone = calendar.timezone;
                 timezone = timezone.replace(/\r\n|\r|\n/g,'&#13;\r\n');
 
-                response += "<cal:calendar-timezone>" + timezone + "</cal:calendar-timezone>";
+                response += "<C:calendar-timezone>" + timezone + "</C:calendar-timezone>";
                 break;
 
             case 'current-user-privilege-set':
@@ -353,7 +382,7 @@ function returnPropfindElements(req, res, next, calendar, childs){
                 break;
 
             case 'displayname':
-                response += "<d:displayname>" + calendar.displayname + "</d:displayname>";
+                response += "<displayname>" + calendar.displayname + "</displayname>";
                 break;
 
             case 'language-code':
@@ -365,11 +394,11 @@ function returnPropfindElements(req, res, next, calendar, childs){
                 break;
 
             case 'owner':
-                response += "<d:owner><d:href>/p/" + username +"/</d:href></d:owner>";
+                response += "<owner>/p/" + username +"/</owner>";
                 break;
 
             case 'pre-publish-url':
-                response += "<cs:pre-publish-url><d:href>https://127.0.0.1/cal/" + username + "/" + calendar.pkey + "</d:href></cs:pre-publish-url>";
+                response += "<CS:pre-publish-url><href>https://127.0.0.1:9876/cal/" + username + "/" + calendar.pkey + "</href></CS:pre-publish-url>";
                 break;
 
             case 'publish-url':
@@ -401,11 +430,11 @@ function returnPropfindElements(req, res, next, calendar, childs){
                 break;
 
             case 'resourcetype':
-                response += "<d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>";
+                response += "<resourcetype><C:calendar/><collection/></resourcetype>";
                 break;
 
             case 'schedule-calendar-transp':
-                response += "<cal:schedule-calendar-transp><cal:opaque/></cal:schedule-calendar-transp>";
+                response += "<C:schedule-calendar-transp><C:opaque/></C:schedule-calendar-transp>";
                 break;
 
             case 'schedule-default-calendar-URL':
@@ -429,23 +458,24 @@ function returnPropfindElements(req, res, next, calendar, childs){
                 break;
 
             case 'supported-calendar-component-set':
-                response += "";
+                response += "<C:supported-calendar-component-set><C:comp name=\"VTODO\"/><C:comp name=\"VEVENT\"/><C:comp name=\"VJOURNAL\"/></C:supported-calendar-component-set>";
                 break;
 
             case 'supported-calendar-component-sets':
-                response += "<cal:supported-calendar-component-set><cal:comp name=\"VEVENT\"/></cal:supported-calendar-component-set>";
+                response += "<C:supported-calendar-component-set><C:comp name=\"VEVENT\"/></C:supported-calendar-component-set>";
                 break;
 
             case 'supported-report-set':
-                response += getSupportedReportSet(false);
+                response += getSupportedReportSet(isRoot);
                 break;
 
             case 'getctag':
-                response += "<cs:getctag>http://swordlord.com/ns/sync/" + token + "</cs:getctag>";
+                response += "<CS:getctag>\"" + calendar.pkey + Number(date) + "\"</CS:getctag>";
+                // response += "<CS:getctag>\"d41d8cd98f00b204e9800998ecf8427e\"</CS:getctag>";
                 break;
 
             case 'getetag':
-                // no response?
+                response += "<getetag>\"" + Number(date) + "\"</getetag>";
                 break;
 
             case 'checksum-versions':
@@ -453,7 +483,7 @@ function returnPropfindElements(req, res, next, calendar, childs){
                 break;
 
             case 'sync-token':
-                response += "<d:sync-token>http://swordlord.com/ns/sync/" + token + "</d:sync-token>";
+                response += "<sync-token>http://swordlord.com/ns/sync/" + token + "</sync-token>";
                 break;
 
             case 'acl':
@@ -461,11 +491,28 @@ function returnPropfindElements(req, res, next, calendar, childs){
                 break;
 
             case 'getcontenttype':
-                //response += "<d:getcontenttype>text/calendar;charset=utf-8</d:getcontenttype>";
+                //response += "<getcontenttype>text/calendar;charset=utf-8</getcontenttype>";
+                break;
+            
+            case 'principal-collection-set':
+                response += "<principal-collection-set>/p/</principal-collection-set>";
+                break;
+
+            case 'calendar-free-busy-set':
+                response += "<calendar-free-busy-set>/</calendar-free-busy-set>";
+                break;
+
+            case 'current-user-principal':
+                response += "<current-user-principal>/p/" + username + "/</current-user-principal>";
                 break;
 
             default:
-                if(name != 'text') log.warn("CAL-PF: not handled: " + name);
+                if(name != 'text') {
+                    log.warn("CAL-PF: not handled: " + name);
+                    if(typeof tempArr != 'undefined'){
+                        tempArr.push(name);
+                    }
+                }
                 break;
         }
     }
@@ -473,65 +520,116 @@ function returnPropfindElements(req, res, next, calendar, childs){
     return response;
 }
 
-function returnCalendar(req, res, next, calendar, childs){
+function returnCalendar(req, res, next, calendar, childs, isRoot ){
     var response = "";
     var username = req.params.username;
 
-    log.error(calendar.pkey);
+    if(typeof isRoot == "undefined"){
+        isRoot = false;
+    }
 
-    response += "	<d:response>";
-    response += "		<d:href>/cal/" + username + "/" + calendar.pkey + "/</d:href>";
-    response += "		<d:propstat>";
-    response += "			<d:prop>";
+    response += "	<response>";
+    response += "		<href>/cal/" + username + "/" + calendar.pkey + "/</href>";
+    response += "		<propstat>";
+    response += "			<prop>";
 
-    response += returnPropfindElements(req, res, next, calendar, childs);
+    var tempArr = [];
 
-    response += "			</d:prop>";
-    response += "			<d:status>HTTP/1.1 200 OK</d:status>";
-    response += "		</d:propstat>";
-    response += "	</d:response>";
+    var returned = returnPropfindElements(req, res, next, calendar, childs, isRoot, tempArr);
+    response += returned;
 
-    log.error(`response is ${response}`);
+    response += "			</prop>";
+    response += "			<status>HTTP/1.1 200 OK</status>";
+    response += "		</propstat>";
+    if(isRoot == true){
+        for(var j=0;j<tempArr.length;j++){
+            response +=`<propstat>`
+            response +=`<prop>`
+            response +=`<${tempArr[j]}/>`
+            response +=`</prop>`
+            response +=`<status>HTTP/1.1 404 Not Found</status>`
+            response +=`</propstat>`
+        }
+    }
+    response += "	</response>";
 
     return response;
 }
 
-function getCalendarRootNodeResponse(req, res, next, childs){
+
+// depressed, use returnCalendar instead
+function getCalendarRootNodeResponse(req, res, next, childs, updatedAt){
     var response = "";
+
+    var updatedAt = updatedAt || new Date();
 
     var owner = req.params.username;
 
-    response += "<d:response><d:href>/cal" + "/"+ req.params.username+"/"+req.params.calendar_id+"/" + "</d:href>";
-    response += "<d:propstat>";
-    response += "<d:prop>";
+
+    response += "<response><href>/cal" + "/"+ req.params.username+"/"+req.params.calendar_id+"/" + "</href>";
+    response += "<propstat>";
+    response += "<prop>";
+
+    tempArr = [];
 
     var len = childs.length;
+    var date = Date.parse(updatedAt);
+
     for (var i = 0; i < len; ++i){
         var child = childs[i];
         var name = child.name();
+
         switch(name){
             case 'current-user-privilege-set':
                 response += getCurrentUserPrivilegeSet();
                 break;
 
             case 'owner':
-                response += "<d:owner><d:href>/p/" + owner +"/</d:href></d:owner>";
+                response += "<owner>/p/" + owner +"/</owner>";
                 break;
 
             case 'resourcetype':
-                response += "<d:resourcetype><d:collection/></d:resourcetype>";
+                response += "<resourcetype><C:calendar/><collection/></resourcetype>";
                 break;
 
             case 'supported-report-set':
                 response += getSupportedReportSet(true);
                 break;
+            case 'supported-calendar-component-set':
+                response +=  `<C:supported-calendar-component-set>`
+                // response +=  `<C:comp name="VTODO"/>`
+                response +=  `<C:comp name="VEVENT"/>`
+                // response +=  `<C:comp name="VJOURNAL"/>`
+                response +=  `</C:supported-calendar-component-set>`
+                break;
+
+            case 'getetag':
+                response += "<getetag>\"" + Number(date) + "\"</getetag>";
+                break;
+            
+            default:
+                log.error('not handdled line 566:'+name);
+                if(typeof tempArr != "undefined"){
+                    tempArr.push(name);
+                }
+                break;
         }
     }
 
-    response += "</d:prop>";
-    response += "<d:status>HTTP/1.1 200 OK</d:status>";
-    response += "</d:propstat>";
-    response += "</d:response>";
+
+    response += "</prop>";
+    response += "<status>HTTP/1.1 200 OK</status>";
+    response += "</propstat>";
+
+    for(var j=0;j<tempArr.length;j++){
+        response +=`<propstat>`
+        response +=`<prop>`
+        response +=`<${tempArr[j]}/>`
+        response +=`</prop>`
+        response +=`<status>HTTP/1.1 404 Not Found</status>`
+        response +=`</propstat>`
+    }
+    response += "</response>";
 
 
     return response;
@@ -540,19 +638,19 @@ function getCalendarRootNodeResponse(req, res, next, childs){
 function getSupportedReportSet(isRoot){
     var response = "";
 
-    response += "<d:supported-report-set>";
+    response += "<supported-report-set>";
 
     if(!isRoot){
-        response += "<d:supported-report><d:report><cal:calendar-multiget/></d:report></d:supported-report>";
-        response += "<d:supported-report><d:report><cal:calendar-query/></d:report></d:supported-report>";
-        response += "<d:supported-report><d:report><cal:free-busy-query/></d:report></d:supported-report>";
+        response += "<supported-report><report>calendar-multiget</report></supported-report>";
+        response += "<supported-report><report>calendar-query</report></supported-report>";
+        response += "<supported-report><report>free-busy-query</report></supported-report>";
     }
 
-    response += "<d:supported-report><d:report><d:sync-collection/></d:report></d:supported-report>";
-    response += "<d:supported-report><d:report><d:expand-property/></d:report></d:supported-report>";
-    response += "<d:supported-report><d:report><d:principal-property-search/></d:report></d:supported-report>";
-    response += "<d:supported-report><d:report><d:principal-search-property-set/></d:report></d:supported-report>";
-    response += "</d:supported-report-set>";
+    response += "<supported-report><report>principal-property-search</report></supported-report>";
+    response += "<supported-report><report>sync-collection</report></supported-report>";
+    response += "<supported-report><report>expand-property</report></supported-report>";
+    response += "<supported-report><report>principal-search-property-set</report></supported-report>";
+    response += "</supported-report-set>";
 
     return response;
 }
@@ -560,19 +658,19 @@ function getSupportedReportSet(isRoot){
 function getCurrentUserPrivilegeSet(){
     var response = "";
 
-    response += "<d:current-user-privilege-set>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><cal:read-free-busy/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:write/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:write-acl/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:write-content/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:write-properties/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:bind/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:unbind/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:unlock/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:read/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:read-acl/></d:privilege>";
-    response += "<d:privilege xmlns:d=\"DAV:\"><d:read-current-user-privilege-set/></d:privilege>";
-    response += "</d:current-user-privilege-set>";
+    response += "<current-user-privilege-set>";
+    response += "<privilege xmlns=\"DAV:\"><C:read-free-busy/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><write/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><write-acl/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><write-content/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><write-properties/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><bind/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><unbind/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><unlock/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><read/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><read-acl/></privilege>";
+    response += "<privilege xmlns=\"DAV:\"><read-current-user-privilege-set/></privilege>";
+    response += "</current-user-privilege-set>";
 
     return response;
 }
@@ -581,48 +679,48 @@ function getACL(req, res, next){
     var username = req.params.username;
     var response = "";
 
-    response += "<d:acl>";
-    response += "    <d:ace>";
-    response += "        <d:principal><d:href>/p/" + username + "</d:href></d:principal>";
-    response += "        <d:grant><d:privilege><d:read/></d:privilege></d:grant>";
-    response += "        <d:protected/>";
-    response += "    </d:ace>";
+    response += "<acl>";
+    response += "    <ace>";
+    response += "        <principal><href>/p/" + username + "</href></principal>";
+    response += "        <grant><privilege><read/></privilege></grant>";
+    response += "        <protected/>";
+    response += "    </ace>";
 
-    response += "    <d:ace>";
-    response += "        <d:principal><d:href>/p/" + username + "</d:href></d:principal>";
-    response += "        <d:grant><d:privilege><d:write/></d:privilege></d:grant>";
-    response += "        <d:protected/>";
-    response += "    </d:ace>";
+    response += "    <ace>";
+    response += "        <principal><href>/p/" + username + "</href></principal>";
+    response += "        <grant><privilege><write/></privilege></grant>";
+    response += "        <protected/>";
+    response += "    </ace>";
 
-    response += "    <d:ace>";
-    response += "        <d:principal><d:href>/p/" + username + "/calendar-proxy-write/</d:href></d:principal>";
-    response += "        <d:grant><d:privilege><d:read/></d:privilege></d:grant>";
-    response += "        <d:protected/>";
-    response += "    </d:ace>";
+    response += "    <ace>";
+    response += "        <principal><href>/p/" + username + "/calendar-proxy-write/</href></principal>";
+    response += "        <grant><privilege><read/></privilege></grant>";
+    response += "        <protected/>";
+    response += "    </ace>";
 
-    response += "    <d:ace>";
-    response += "        <d:principal><d:href>/p/" + username + "/calendar-proxy-write/</d:href></d:principal>";
-    response += "        <d:grant><d:privilege><d:write/></d:privilege></d:grant>";
-    response += "        <d:protected/>";
-    response += "    </d:ace>";
+    response += "    <ace>";
+    response += "        <principal><href>/p/" + username + "/calendar-proxy-write/</href></principal>";
+    response += "        <grant><privilege><write/></privilege></grant>";
+    response += "        <protected/>";
+    response += "    </ace>";
 
-    response += "    <d:ace>";
-    response += "        <d:principal><d:href>/p/" + username + "/calendar-proxy-read/</d:href></d:principal>";
-    response += "        <d:grant><d:privilege><d:read/></d:privilege></d:grant>";
-    response += "        <d:protected/>";
-    response += "    </d:ace>";
+    response += "    <ace>";
+    response += "        <principal><href>/p/" + username + "/calendar-proxy-read/</href></principal>";
+    response += "        <grant><privilege><read/></privilege></grant>";
+    response += "        <protected/>";
+    response += "    </ace>";
 
-    response += "    <d:ace>";
-    response += "        <d:principal><d:authenticated/></d:principal>";
-    response += "        <d:grant><d:privilege><cal:read-free-busy/></d:privilege></d:grant>";
-    response += "        <d:protected/>";
-    response += "    </d:ace>";
+    response += "    <ace>";
+    response += "        <principal><authenticated/></principal>";
+    response += "        <grant><privilege><C:read-free-busy/></privilege></grant>";
+    response += "        <protected/>";
+    response += "    </ace>";
 
-    response += "    <d:ace>";
-    response += "        <d:principal><d:href>/p/system/admins/</d:href></d:principal>";
-    response += "        <d:grant><d:privilege><d:all/></d:privilege></d:grant>";
-    response += "        <d:protected/>";
-    response += "    </d:ace>";
+    response += "    <ace>";
+    response += "        <principal><href>/p/system/admins/</href></principal>";
+    response += "        <grant><privilege><all/></privilege></grant>";
+    response += "        <protected/>";
+    response += "    </ace>";
 
     return response;
 }
@@ -795,9 +893,9 @@ function handleReportCalendarQuery(req, res, next){
                 for (var j=0; j < result.count; ++j){
                     var ics = result.rows[j];
 
-                    response += "<d:response><d:href>/cal" +"/"+ req.params.username+"/"+req.params.calendar_id+"/" + "</d:href>";
-                    response += "<d:propstat>";
-                    response += "<d:prop>";
+                    response += "<response><href>/cal" +"/"+ req.params.username+"/"+req.params.calendar_id+"/" + "</href>";
+                    response += "<propstat>";
+                    response += "<prop>";
 
                     var date = Date.parse(ics.updatedAt);
 
@@ -806,11 +904,11 @@ function handleReportCalendarQuery(req, res, next){
                         var name = child.name();
                         switch(name){
                             case 'getetag':
-                                response += "<d:getetag>\"" + Number(date) + "\"</d:getetag>";
+                                response += "<getetag>\"" + Number(date) + "\"</getetag>";
                                 break;
 
                             case 'getcontenttype':
-                                response += "<d:getcontenttype>text/calendar; charset=utf-8; component=" + cal.supported_cal_component + "</d:getcontenttype>";
+                                response += "<getcontenttype>text/calendar; charset=utf-8; component=" + cal.supported_cal_component + "</getcontenttype>";
                                 break;
 
                             case 'calendar-data':
@@ -824,16 +922,16 @@ function handleReportCalendarQuery(req, res, next){
                         }
                     }
 
-                    response += "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>";
-                    response += "</d:response>";
+                    response += "</prop><status>HTTP/1.1 200 OK</status></propstat>";
+                    response += "</response>";
                 }
 
 
-                res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
+                res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
                 
                 log.error(response);
                 res.write(response);
-                res.write("</d:multistatus>");
+                res.write("</multistatus>");
 
                 res.end();
             });
@@ -910,10 +1008,10 @@ function handleReportSyncCollection(req, res, next){
 
                 log.debug(`response : ${response}`);
 
-                res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
+                res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
                 res.write(response);
-                res.write("<d:sync-token>http://swordlord.org/ns/sync/" + cal.synctoken + "</d:sync-token>");
-                res.write("</d:multistatus>");
+                res.write("<sync-token>http://swordlord.org/ns/sync/" + cal.synctoken + "</sync-token>");
+                res.write("</multistatus>");
 
                 log.debug(`end report`)
                 res.status(200).end();
@@ -925,9 +1023,9 @@ function handleReportSyncCollection(req, res, next){
 function handleReportCalendarProp(req, res, next, node, cal, ics){
     var response = "";
 
-    response += "<d:response>";
-    response += "<d:href>/cal/" + req.params.username +"/"+req.params.calendar_id + "/</d:href>";
-    response += "<d:propstat><d:prop>";
+    response += "<response>";
+    response += "<href>/cal/" + req.params.username +"/"+req.params.calendar_id + "/</href>";
+    response += "<propstat><prop>";
 
     var childs = node.childNodes();
 
@@ -939,11 +1037,11 @@ function handleReportCalendarProp(req, res, next, node, cal, ics){
         var name = child.name();
         switch(name){
             case 'getetag':
-                response += "<d:getetag>\"" + Number(date) + "\"</d:getetag>";
+                response += "<getetag>\"" + Number(date) + "\"</getetag>";
                 break;
 
             case 'getcontenttype':
-                response += "<d:getcontenttype>text/calendar; charset=utf-8; component=" + cal.supported_cal_component + "</d:getcontenttype>";
+                response += "<getcontenttype>text/calendar; charset=utf-8; component=" + cal.supported_cal_component + "</getcontenttype>";
                 break;
 
             default:
@@ -953,10 +1051,10 @@ function handleReportCalendarProp(req, res, next, node, cal, ics){
         }
     }
 
-    response += "</d:prop>";
-    response += "<d:status>HTTP/1.1 200 OK</d:status>";
-    response += "</d:propstat>";
-    response += "</d:response>";
+    response += "</prop>";
+    response += "<status>HTTP/1.1 200 OK</status>";
+    response += "</propstat>";
+    response += "</response>";
 
     return response;
 }
@@ -1016,23 +1114,23 @@ function handleReportHrefs(req, res, next, arrIcsIds){
 
             var date = Date.parse(ics.updatedAt);
 
-            response += "<d:response>";
-            response += "<d:href>/cal" + "/"+ req.params.username+"/"+req.params.calendar_id+"/" + ics.pkey + ".ics</d:href>";
-            response += "<d:propstat><d:prop>";
-            response += "<cal:calendar-data>" + ics.content + "</cal:calendar-data>";
-            response += "<d:getetag>\"" + Number(date) + "\"</d:getetag>";
-            response += "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>";
-            response += "<d:propstat><d:prop>";
-            response += "<cs:created-by/><cs:updated-by/>";
-            response += "</d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat>";
-            response += "</d:response>";
+            response += "<response>";
+            response += "<href>/cal" + "/"+ req.params.username+"/"+req.params.calendar_id+"/" + ics.pkey + ".ics</href>";
+            response += "<propstat><prop>";
+            response += "<C:calendar-data>" + ics.content + "</C:calendar-data>";
+            response += "<getetag>\"" + Number(date) + "\"</getetag>";
+            response += "</prop><status>HTTP/1.1 200 OK</status></propstat>";
+            response += "<propstat><prop>";
+            response += "<CS:created-by/><CS:updated-by/>";
+            response += "</prop><status>HTTP/1.1 404 Not Found</status></propstat>";
+            response += "</response>";
         }
 
-        res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
+        res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
 
         res.write(response);
 
-        res.write("</d:multistatus>\r\n");
+        res.write("</multistatus>\r\n");
 
         res.end();
     });
@@ -1084,12 +1182,12 @@ function handleProppatch(req,res,next){
                     var name = child.name();
                     switch(name){
                         case 'default-alarm-vevent-date':
-                            response += "<cal:default-alarm-vevent-date/>";
+                            response += "<C:default-alarm-vevent-date/>";
                             log.info("proppatch default-alarm-vevent-date not handled yet");
                             break;
 
                         case 'default-alarm-vevent-datetime':
-                            response += "<cal:default-alarm-vevent-datetime/>";
+                            response += "<C:default-alarm-vevent-datetime/>";
                             log.info("proppatch default-alarm-vevent-datetime not handled yet");
                             break;
 
@@ -1100,17 +1198,17 @@ function handleProppatch(req,res,next){
                     }
                 }
 
-                res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
-                res.write("	<d:response>\r\n");
-                res.write("		<d:href>/cal/" + req.params.username+"/"+req.params.calendar_id + "/</d:href>\r\n");
-                res.write("		<d:propstat>\r\n");
-                res.write("			<d:prop>\r\n");
+                res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
+                res.write("	<response>\r\n");
+                res.write("		<href>/cal/" + req.params.username+"/"+req.params.calendar_id + "/</href>\r\n");
+                res.write("		<propstat>\r\n");
+                res.write("			<prop>\r\n");
                 res.write(response);
-                res.write("			</d:prop>\r\n");
-                res.write("			<d:status>HTTP/1.1 403 Forbidden</d:status>\r\n");
-                res.write("		</d:propstat>\r\n");
-                res.write("	</d:response>\r\n");
-                res.write("</d:multistatus>\r\n");
+                res.write("			</prop>\r\n");
+                res.write("			<status>HTTP/1.1 403 Forbidden</status>\r\n");
+                res.write("		</propstat>\r\n");
+                res.write("	</response>\r\n");
+                res.write("</multistatus>\r\n");
             }else{
                 var len = childs.length;
                 for (var i=0; i < len; ++i){
@@ -1118,22 +1216,22 @@ function handleProppatch(req,res,next){
                     var name = child.name();
                     switch(name){
                         case 'default-alarm-vevent-date':
-                            response += "<cal:default-alarm-vevent-date/>";
+                            response += "<C:default-alarm-vevent-date/>";
                             log.info("proppatch default-alarm-vevent-date not handled yet");
                             break;
 
                         case 'default-alarm-vevent-datetime':
-                            response += "<cal:default-alarm-vevent-datetime/>";
+                            response += "<C:default-alarm-vevent-datetime/>";
                             log.info("proppatch default-alarm-vevent-datetime not handled yet");
                             break;
 
                         case 'displayname':
-                            response += "<cal:displayname/>";
+                            response += "<C:displayname/>";
                             cal.displayname = child.text();
                             break;
 
                         case 'calendar-timezone':
-                            response += "<cal:calendar-timezone/>";
+                            response += "<C:calendar-timezone/>";
                             cal.timezone = child.text();
                             break;
 
@@ -1158,17 +1256,17 @@ function handleProppatch(req,res,next){
                     log.warn('cal saved');
                 });
 
-                res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
-                res.write("	<d:response>\r\n");
-                res.write("		<d:href>" + "/"+ req.params.username+"/"+req.params.calendar_id+"/" + "</d:href>\r\n");
-                res.write("		<d:propstat>\r\n");
-                res.write("			<d:prop>\r\n");
+                res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
+                res.write("	<response>\r\n");
+                res.write("		<href>" + "/"+ req.params.username+"/"+req.params.calendar_id+"/" + "</href>\r\n");
+                res.write("		<propstat>\r\n");
+                res.write("			<prop>\r\n");
                 res.write(response);
-                res.write("			</d:prop>\r\n");
-                res.write("			<d:status>HTTP/1.1 200 OK</d:status>\r\n");
-                res.write("		</d:propstat>\r\n");
-                res.write("	</d:response>\r\n");
-                res.write("</d:multistatus>\r\n");
+                res.write("			</prop>\r\n");
+                res.write("			<status>HTTP/1.1 200 OK</status>\r\n");
+                res.write("		</propstat>\r\n");
+                res.write("	</response>\r\n");
+                res.write("</multistatus>\r\n");
             }
 
             res.status(200).end();
@@ -1183,55 +1281,55 @@ function returnOutbox(req,res,next){
 
     var username = req.params.username
 
-    response += "<d:response>";
-    response += "   <d:href>/cal/" + username + "/outbox/</d:href>";
-    response += "    <d:propstat>";
-    response += "        <d:prop>";
-    response += "            <d:current-user-privilege-set>";
-    response += "               <d:privilege xmlns:d=\"DAV:\">";
-    response += "                   <d:read/>";
-    response += "               </d:privilege>";
-    response += "               <d:privilege xmlns:d=\"DAV:\">";
-    response += "                   <d:read-acl/>";
-    response += "               </d:privilege>";
-    response += "               <d:privilege xmlns:d=\"DAV:\">";
-    response += "                   <d:read-current-user-privilege-set/>";
-    response += "               </d:privilege>";
-    response += "               <d:privilege xmlns:d=\"DAV:\">";
-    response += "                   <d:schedule-post-vevent xmlns:d=\"urn:ietf:params:xml:ns:caldav\"/>";
-    response += "               </d:privilege>";
-    response += "               <d:privilege xmlns:d=\"DAV:\">";
-    response += "                   <d:schedule-query-freebusy xmlns:d=\"urn:ietf:params:xml:ns:caldav\"/>";
-    response += "               </d:privilege>";
-    response += "           </d:current-user-privilege-set>";
-    response += "           <d:owner>";
-    response += "               <d:href>/p/" + username + "/</d:href>";
-    response += "           </d:owner>";
-    response += "           <d:resourcetype>";
-    response += "              <d:collection/>";
-    response += "               <cal:schedule-outbox/>";
-    response += "           </d:resourcetype>";
-    response += "           <d:supported-report-set>";
-    response += "              <d:supported-report>";
-    response += "                   <d:report>";
-    response += "                       <d:expand-property/>";
-    response += "                   </d:report>";
-    response += "               </d:supported-report>";
-    response += "               <d:supported-report>";
-    response += "                   <d:report>";
-    response += "                       <d:principal-property-search/>";
-    response += "                   </d:report>";
-    response += "               </d:supported-report>";
-    response += "               <d:supported-report>";
-    response += "                    <d:report>";
-    response += "                       <d:principal-search-property-set/>";
-    response += "                   </d:report>";
-    response += "               </d:supported-report>";
-    response += "            </d:supported-report-set>";
-    response += "       </d:prop>";
-    response += "       <d:status>HTTP/1.1 200 OK</d:status>";
-    response += "   </d:propstat>";
-    response += "</d:response>";
+    response += "<response>";
+    response += "   <href>/cal/" + username + "/outbox/</href>";
+    response += "    <propstat>";
+    response += "        <prop>";
+    response += "            <current-user-privilege-set>";
+    response += "               <privilege xmlns=\"DAV:\">";
+    response += "                   <read/>";
+    response += "               </privilege>";
+    response += "               <privilege xmlns=\"DAV:\">";
+    response += "                   <read-acl/>";
+    response += "               </privilege>";
+    response += "               <privilege xmlns=\"DAV:\">";
+    response += "                   <read-current-user-privilege-set/>";
+    response += "               </privilege>";
+    response += "               <privilege xmlns=\"DAV:\">";
+    response += "                   <schedule-post-vevent xmlns=\"urn:ietf:params:xml:ns:caldav\"/>";
+    response += "               </privilege>";
+    response += "               <privilege xmlns=\"DAV:\">";
+    response += "                   <schedule-query-freebusy xmlns=\"urn:ietf:params:xml:ns:caldav\"/>";
+    response += "               </privilege>";
+    response += "           </current-user-privilege-set>";
+    response += "           <owner>";
+    response += "               <href>/p/" + username + "/</href>";
+    response += "           </owner>";
+    response += "           <resourcetype>";
+    response += "              <collection/>";
+    response += "               <C:schedule-outbox/>";
+    response += "           </resourcetype>";
+    response += "           <supported-report-set>";
+    response += "              <supported-report>";
+    response += "                   <report>";
+    response += "                       <expand-property/>";
+    response += "                   </report>";
+    response += "               </supported-report>";
+    response += "               <supported-report>";
+    response += "                   <report>";
+    response += "                       <principal-property-search/>";
+    response += "                   </report>";
+    response += "               </supported-report>";
+    response += "               <supported-report>";
+    response += "                    <report>";
+    response += "                       <principal-search-property-set/>";
+    response += "                   </report>";
+    response += "               </supported-report>";
+    response += "            </supported-report-set>";
+    response += "       </prop>";
+    response += "       <status>HTTP/1.1 200 OK</status>";
+    response += "   </propstat>";
+    response += "</response>";
 
     return response;
 }
@@ -1241,70 +1339,70 @@ function returnNotifications(req,res,next){
 
     var username = req.params.username;
 
-    response += "<d:response>";
-    response += "<d:href>/cal/" + username + "/notifications/</d:href>";
-    response += "<d:propstat>";
-    response += "    <d:prop>";
-    response += "        <d:current-user-privilege-set>";
-    response += "            <d:privilege xmlns:d=\"DAV:\">";
-    response += "                <d:write/>";
-    response += "           </d:privilege>";
-    response += "           <d:privilege xmlns:d=\"DAV:\">";
-    response += "               <d:write-acl/>";
-    response += "           </d:privilege>";
-    response += "           <d:privilege xmlns:d=\"DAV:\">";
-    response += "               <d:write-properties/>";
-    response += "          </d:privilege>";
-    response += "           <d:privilege xmlns:d=\"DAV:\">";
-    response += "               <d:write-content/>";
-    response += "           </d:privilege>";
-    response += "            <d:privilege xmlns:d=\"DAV:\">";
-    response += "               <d:bind/>";
-    response += "            </d:privilege>";
-    response += "            <d:privilege xmlns:d=\"DAV:\">";
-    response += "                <d:unbind/>";
-    response += "            </d:privilege>";
-    response += "            <d:privilege xmlns:d=\"DAV:\">";
-    response += "                <d:unlock/>";
-    response += "           </d:privilege>";
-    response += "           <d:privilege xmlns:d=\"DAV:\">";
-    response += "               <d:read/>";
-    response += "           </d:privilege>";
-    response += "           <d:privilege xmlns:d=\"DAV:\">";
-    response += "                <d:read-acl/>";
-    response += "           </d:privilege>";
-    response += "           <d:privilege xmlns:d=\"DAV:\">";
-    response += "               <d:read-current-user-privilege-set/>";
-    response += "            </d:privilege>";
-    response += "       </d:current-user-privilege-set>";
-    response += "       <d:owner>";
-    response += "           <d:href>/p/" + username + "/</d:href>";
-    response += "       </d:owner>";
-    response += "       <d:resourcetype>";
-    response += "           <d:collection/>";
-    response += "           <cs:notification/>";
-    response += "       </d:resourcetype>";
-    response += "       <d:supported-report-set>";
-    response += "           <d:supported-report>";
-    response += "               <d:report>";
-    response += "                   <d:expand-property/>";
-    response += "               </d:report>";
-    response += "           </d:supported-report>";
-    response += "           <d:supported-report>";
-    response += "               <d:report>";
-    response += "                   <d:principal-property-search/>";
-    response += "               </d:report>";
-    response += "           </d:supported-report>";
-    response += "          <d:supported-report>";
-    response += "               <d:report>";
-    response += "                  <d:principal-search-property-set/>";
-    response += "              </d:report>";
-    response += "           </d:supported-report>";
-    response += "       </d:supported-report-set>";
-    response += "   </d:prop>";
-    response += "<d:status>HTTP/1.1 200 OK</d:status>";
-    response += "</d:propstat>";
-    response += "</d:response>";
+    response += "<response>";
+    response += "<href>/cal/" + username + "/notifications/</href>";
+    response += "<propstat>";
+    response += "    <prop>";
+    response += "        <current-user-privilege-set>";
+    response += "            <privilege xmlns=\"DAV:\">";
+    response += "                <write/>";
+    response += "           </privilege>";
+    response += "           <privilege xmlns=\"DAV:\">";
+    response += "               <write-acl/>";
+    response += "           </privilege>";
+    response += "           <privilege xmlns=\"DAV:\">";
+    response += "               <write-properties/>";
+    response += "          </privilege>";
+    response += "           <privilege xmlns=\"DAV:\">";
+    response += "               <write-content/>";
+    response += "           </privilege>";
+    response += "            <privilege xmlns=\"DAV:\">";
+    response += "               <bind/>";
+    response += "            </privilege>";
+    response += "            <privilege xmlns=\"DAV:\">";
+    response += "                <unbind/>";
+    response += "            </privilege>";
+    response += "            <privilege xmlns=\"DAV:\">";
+    response += "                <unlock/>";
+    response += "           </privilege>";
+    response += "           <privilege xmlns=\"DAV:\">";
+    response += "               <read/>";
+    response += "           </privilege>";
+    response += "           <privilege xmlns=\"DAV:\">";
+    response += "                <read-acl/>";
+    response += "           </privilege>";
+    response += "           <privilege xmlns=\"DAV:\">";
+    response += "               <read-current-user-privilege-set/>";
+    response += "            </privilege>";
+    response += "       </current-user-privilege-set>";
+    response += "       <owner>";
+    response += "           <href>/p/" + username + "/</href>";
+    response += "       </owner>";
+    response += "       <resourcetype>";
+    response += "           <collection/>";
+    response += "           <CS:notification/>";
+    response += "       </resourcetype>";
+    response += "       <supported-report-set>";
+    response += "           <supported-report>";
+    response += "               <report>";
+    response += "                   <expand-property/>";
+    response += "               </report>";
+    response += "           </supported-report>";
+    response += "           <supported-report>";
+    response += "               <report>";
+    response += "                   <principal-property-search/>";
+    response += "               </report>";
+    response += "           </supported-report>";
+    response += "          <supported-report>";
+    response += "               <report>";
+    response += "                  <principal-search-property-set/>";
+    response += "              </report>";
+    response += "           </supported-report>";
+    response += "       </supported-report-set>";
+    response += "   </prop>";
+    response += "<status>HTTP/1.1 200 OK</status>";
+    response += "</propstat>";
+    response += "</response>";
 
     return response;
 }

@@ -6,8 +6,6 @@ function authentication(username, password, callback) {
 
     var USER = obj.USER;
 
-    log.info(USER);
-
 
 
     USER.findOrCreate({ 

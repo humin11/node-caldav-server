@@ -36,6 +36,25 @@ app.use(logger('dev'));
 
 require('body-parser-xml')(bodyParser);
 
+app.use(bodyParser.raw({
+  type: function(req){
+    var contentType = req.headers['content-type'];
+    var defaultParseArr = ['text/calendar'];
+    var shouldParse = false;
+    defaultParseArr.forEach(function(item,index){
+      if(contentType.indexOf(item) != -1){
+        shouldParse = true;
+      }
+    });
+    return shouldParse; 
+  },
+  verify: function(req, res, buf, encoding) {
+    if(buf && buf.length) {
+      req.rawBody = buf.toString(encoding || 'utf8');
+    }
+  }
+}));
+
 app.use(bodyParser.xml({
   limit: '1MB',   // Reject payload bigger than 1 MB
   xmlParseOptions: {
@@ -45,7 +64,6 @@ app.use(bodyParser.xml({
   },
   verify: function(req, res, buf, encoding) {
     if(buf && buf.length) {
-      // Store the raw XML
       req.rawBody = buf.toString(encoding || 'utf8');
     }
   }

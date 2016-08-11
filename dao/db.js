@@ -49,7 +49,7 @@ let CAL = sequelize.define('CAL', {
 })();
 
 
-export default {
+module.exports = {
     USER,
     ICS,
     CAL,

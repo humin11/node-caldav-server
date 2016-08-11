@@ -7,10 +7,6 @@ router.propfind('/', function(req, res, next) {
   handlePrincipal.handlePropfind(req, res, next);
 });
 
-router.propfind('/:calendar_id', function(req, res, next) {
-  handlePrincipal.handlePropfind(req, res, next);
-});
-
 router.proppatch('/', function(req, res, next) {
   handlePrincipal.handleProppatch(req, res, next);
 });
@@ -30,7 +26,5 @@ router.report('/', function(req, res, next) {
 router.get('/', function(req, res, next) {
   handlePrincipal.handleReport(req, res, next);
 });
-
-
 
 module.exports = router;

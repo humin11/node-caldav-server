@@ -8,9 +8,8 @@ var bodyParser = require('body-parser');
 require('babel-core/register');
 
 var log = require('./utils/log');
-var routes = require('./routes/index');
 var calendars = require('./routes/calendars');
-var principles = require('./routes/principals');
+var principals = require('./routes/principals');
 
 require('./dao/db');
 
@@ -76,10 +75,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(httpauth.connect(basic));
 
-app.use('/',principles);
-app.use('/p',principles);
-app.use('/cal',calendars);
+var pathConfig = require('./conf/path')
 
+app.use(pathConfig.mountedPath,calendars);
+app.use('/p',principals);
+app.use('/',principals);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

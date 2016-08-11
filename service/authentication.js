@@ -2,11 +2,8 @@ import log from '../utils/log'
 import obj from '../dao/db'
 
 function authentication(username, password, callback) {
-    log.info(`Login process started for user: ${username}`);
 
     var USER = obj.USER;
-
-
 
     USER.findOrCreate({ 
         where: { username:username,password:password },

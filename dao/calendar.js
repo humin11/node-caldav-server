@@ -16,51 +16,59 @@ export default {
     handleMkcalendar,
 }
 
+// caldav client will call propfind to get all/specific calendar and ics response which format is XML-based
+// statusCode must be 207, otherwise it will be rejected in some clients
 async function handlePropfind(req, res, next){
     log.debug("calendar.propfind called");
 
+    // set status code and standrad head
     helper.setStandardHeaders(res);
     helper.setDAVHeaders(res);
     res.writeHead(207);
     res.write(helper.getXMLHead());
 
-    var response = "";
+    let response = "";
 
-    var body = req.rawBody;
+    let body = req.rawBody;
 
-    var xmlDoc = xml.parseXml(body);
-    var node = xmlDoc.get('/A:propfind/A:prop', {   A: 'DAV:',
+    // parse the request XML using XPATH
+    // Notice:  libxmljs requires node-gyp, which does not work perfect in Windows
+    //          In this case ,you can use *unix or linux subsystems for windows 10 
+    let xmlDoc = xml.parseXml(body);
+    let node = xmlDoc.get('/A:propfind/A:prop', {   A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
         D: "http://apple.com/ns/ical/",
         E: "http://me.com/_namespace/"
     });
-    var childs = node.childNodes();
+    let childs = node.childNodes();
 
-    var isRoot = true;
-    var username = res.locals.username;
-    var calendar_id = res.locals.calendar_id;
-    var ics_id = res.locals.ics_id;
+    let username = res.locals.username;
+    let calendar_id = res.locals.calendar_id;
+    let ics_id = res.locals.ics_id;
 
 
     // if last element === username, then get all calendar info of user, 
     // otherwise only from that specific calendar
+    let isRoot = true;
 
-    // if URL element size === 3, this is a call for the root URL of a user.
+    // if URL element size === 1, this is a call for the user.
+    
+
     log.warn(`url: ${req.url}`);
 
     if(req.url.split("/").length > 1){
         isRoot = false;
     }else if(req.url === "/"){
         // never reach here. 
-        // Mozilla lightning send the same request no matter the url is
-        // So we need to make sure to create or find a calendar 
+        // Mozilla lightning send the same request no matter what the url is
+        // So we need to make sure there is a calendar. If not, create it 
         response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
 
-        var len = childs.length;
-        for (var i=0; i < len; ++i){
-            var child = childs[i];
-            var name = child.name();
+        let len = childs.length;
+        for (let i=0; i < len; ++i){
+            let child = childs[i];
+            let name = child.name();
             switch(name){
                 case 'calendar-free-busy-set':
                     response += "<response><href>/</href></response>";
@@ -93,7 +101,7 @@ async function handlePropfind(req, res, next){
 
     if(isRoot === true){
         log.debug('isRoot: true');
-        var nodeChecksum = xmlDoc.get('/A:propfind/A:prop/C:checksum-versions', {   A: 'DAV:',
+        let nodeChecksum = xmlDoc.get('/A:propfind/A:prop/C:checksum-versions', {   A: 'DAV:',
             B: "urn:ietf:params:xml:ns:caldav",
             C: 'http://calendarserver.org/ns/',
             D: "http://apple.com/ns/ical/",
@@ -101,6 +109,7 @@ async function handlePropfind(req, res, next){
         });
 
         if(nodeChecksum !== undefined){
+            // request has checksum-versions, so just response to it with the calendar url
             response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
             response += "<response><href>" + mountedPath.calDavPath + "/"+ username+"/" + calendar_id+"/" + "</href></response>";
             response += "</multistatus>";
@@ -108,28 +117,19 @@ async function handlePropfind(req, res, next){
             log.debug(`1response:`)
             res.end();
         }else{
-            // first get the root node info
-            response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
-
+            // request does not have checksum-versions
+            // first get the default calendar of the user
             // then add info for all further known calendars of same user
-            var query = { where: { owner: username}, order: [['order', 'ASC']] };
+            response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
+            
+
+            let query = { where: { owner: username}, order: [['order', 'ASC']] };
 
             let result = await CAL.findAndCountAll(query);
 
-            for (var i=0; i < result.count; ++i){
-                var calendar = result.rows[i];
-                if(calendar.pkey == calendar_id){
-                    log.debug('found root calendar')
-                    var isRoot = true;
-                    var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
-                    response += returnedCalendar;
-                }else{
-                    var isRoot = false;
-                    var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
-                    response += returnedCalendar;
-                }
-            }
+            response += getResponseFromAllCalendars(req,res,next,result,childs);
 
+            // TO-DO:
             // response += returnOutbox(req, res, next);
             // response += returnNotifications(req, res, next);
 
@@ -142,7 +142,8 @@ async function handlePropfind(req, res, next){
         log.debug('isRoot: false');
 
         if(calendar_id === "notifications"){
-
+            // calendar_id is notifications
+            // just reply with the default calendar url
             res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">");
             res.write("<response><href>" + mountedPath.calDavPath + "/"+ username+"/"+calendar_id+"/" + "</href>");
             res.write("</response>");
@@ -156,18 +157,20 @@ async function handlePropfind(req, res, next){
             res.end();
             
         }else{
-
-            // If not exists, create it
+            // the request url provide username and calendar_id 
+            // Find the calendar first
             let cal = await CAL.find({ where: {pkey: calendar_id} });
             
+            // If the calendar with same calendar_id not exists, give it
             if(!cal){
                 log.warn('Calendar not found, wait to create');
                     
                 log.debug(req.params);
 
-                var timezone ="Asia/shanghai";
+                // default timezone.
+                let timezone ="Asia/shanghai";
 
-                var defaults = {
+                let defaults = {
                     owner: username,
                     timezone: timezone,
                     order: 'order',
@@ -189,24 +192,11 @@ async function handlePropfind(req, res, next){
 
                 response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
                 // then add info for all further known calendars of same user
-                var query = { where: {owner: username}, order: [['order', 'ASC']] };
+                let query = { where: {owner: username}, order: [['order', 'ASC']] };
 
                 let result = await CAL.findAndCountAll(query);
 
-                for (var i=0; i < result.count; ++i){
-                    var calendar = result.rows[i];
-                    if(calendar.pkey == calendar_id){
-                        log.debug('found root calendar')
-                        var isRoot = true;
-                        var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
-                        response +=returnedCalendar;
-                    }else{
-                        log.debug('found ics')
-                        var isRoot = false;
-                        var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
-                        response += returnedCalendar;
-                    }
-                }
+                response += getResponseFromAllCalendars(req,res,next,result,childs);
 
                 // response += returnOutbox(req, res, next);
                 // response += returnNotifications(req, res, next);
@@ -222,24 +212,11 @@ async function handlePropfind(req, res, next){
                 response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
 
                 // Add info for all further known calendars of same user
-                var query = { where: {owner: username}, order: [['order', 'ASC']] };
+                let query = { where: {owner: username}, order: [['order', 'ASC']] };
 
                 let result = await CAL.findAndCountAll(query);
 
-                for (var i=0; i < result.count; ++i){
-                    var calendar = result.rows[i];
-                    if(calendar.pkey == calendar_id){
-                        log.debug('found root calendar')
-                        var isRoot = true;
-                        var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
-                        response += returnedCalendar;
-                    }else{
-                        log.debug('found other calendar')
-                        var isRoot = false;
-                        var returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
-                        response += returnedCalendar;
-                    }
-                }
+                response += getResponseFromAllCalendars(req,res,next,result,childs);
 
                 let resultICS = await ICS.findAndCountAll({ where: {calendarId: calendar_id}});
 
@@ -247,11 +224,11 @@ async function handlePropfind(req, res, next){
                 if(!resultICS){
                     log.debug('not found ics');
                 }else{
-                    for(var i=0,len=resultICS.count;i<len;i++){
-                        var ics = resultICS.rows[i];
+                    for(let i=0,len=resultICS.count;i<len;i++){
+                        let ics = resultICS.rows[i];
                         log.debug(`found ics:${ics.pkey}`);
-                        var isRoot = false;
-                        var returnedCalendar = returnICSCalendar(req, res, next, ics, childs);
+                        let isRoot = false;
+                        let returnedCalendar = returnICSCalendar(req, res, next, ics, childs);
                         response += returnedCalendar;
                     }    
                 }
@@ -267,56 +244,42 @@ async function handlePropfind(req, res, next){
     }
 }
 
-// not used yet
-async function createDefaultICS(req,res,next,ics_name){
-    
-           
-        var ics_id = ics_name.split('.')[0];
-        var calendar = res.locals.calendar_id;
-
-        var defaults = {
-            calendarId: calendar,
-            content: req.rawBody
-        };
-
-        let [ics,created] = await ICS.findOrCreate({ where: {pkey: ics_id}, defaults: defaults});
-
-        if(created){
-            log.info('Created default ICS ');
+function getResponseFromAllCalendars(req,res,next,calendars,childs){
+    let response = "";
+    let calendar_id = res.locals.calendar_id;
+    for (let i=0; i < calendars.count; ++i){
+        let calendar = calendars.rows[i];
+        if(calendar.pkey == calendar_id){
+            log.debug('found root calendar')
+            let isRoot = true;
+            let returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
+            response += returnedCalendar;
         }else{
-            ics.content = req.rawBody;
-            log.info('Loaded ICS ');
+            let isRoot = false;
+            let returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
+            response += returnedCalendar;
         }
-
-        await ics.save();
-
-        // update calendar collection
-        let cal = await CAL.findOne({ where: {pkey: calendar} } );
-        if(cal !== null && cal !== undefined){
-            await cal.increment('synctoken', { by: 1 });
-        }
+    }
+    return response;
 }
 
-function returnPropfindElements(req, res, next, calendar, childs, isRoot, tempArr){
-    var response = "";
+function returnPropfindElements(req, res, next, calendar, childs, isRoot, tempArr = []){
+    let response = "";
 
     if(typeof isRoot == "undefined"){
         isRoot = false;
     }
 
-    tempArr = tempArr || [];
+    let username = res.locals.username;
 
-    var username = res.locals.username;
+    let token = calendar.synctoken;
 
-    var token = calendar.synctoken;
+    let len = childs.length;
+    let date = Date.parse(calendar.updatedAt);
 
-    var len = childs.length;
-    var date = Date.parse(calendar.updatedAt);
-
-    var len = childs.length;
-    for (var i=0; i < len; ++i){
-        var child = childs[i];
-        var name = child.name();
+    for (let i=0; i < len; ++i){
+        let child = childs[i];
+        let name = child.name();
         switch(name){
             case 'add-member':
                 response += "";
@@ -351,7 +314,7 @@ function returnPropfindElements(req, res, next, calendar, childs, isRoot, tempAr
                 break;
 
             case 'calendar-timezone':
-                var timezone = calendar.timezone;
+                let timezone = calendar.timezone;
                 timezone = timezone.replace(/\r\n|\r|\n/g,'&#13;\r\n');
 
                 response += "<C:calendar-timezone>" + timezone + "</C:calendar-timezone>";
@@ -508,18 +471,15 @@ function returnPropfindElements(req, res, next, calendar, childs, isRoot, tempAr
     return response;
 }
 
-function returnPropfindICSElements(req, res, next, ics, childs, tempArr){
-    var response = "";
+function returnPropfindICSElements(req, res, next, ics, childs, tempArr = []){
+    let response = "";
 
-    tempArr = tempArr || [];
+    let len = childs.length;
+    let date = Date.parse(ics.updatedAt);
 
-    var len = childs.length;
-    var date = Date.parse(ics.updatedAt);
-
-    var len = childs.length;
-    for (var i=0; i < len; ++i){
-        var child = childs[i];
-        var name = child.name();
+    for (let i=0; i < len; ++i){
+        let child = childs[i];
+        let name = child.name();
         switch(name){
             case 'getetag':
                 response += "<getetag>\"" + ics.pkey + "-" + Number(date) + "\"</getetag>";
@@ -548,23 +508,23 @@ function returnPropfindICSElements(req, res, next, ics, childs, tempArr){
 }
 
 function returnICSCalendar(req, res, next, ics, childs){
-    var response = "";
-    var username = res.locals.username;
+    let response = "";
+    let username = res.locals.username;
 
     response += "	<response>";
     response += "		<href>" + mountedPath.calDavPath+"/" + username + "/" + ics.calendarId + "/" + ics.pkey + ".ics</href>";
     response += "		<propstat>";
     response += "			<prop>";
 
-    var tempArr = [];
+    let tempArr = [];
 
-    var returned = returnPropfindICSElements(req, res, next, ics, childs, tempArr);
+    let returned = returnPropfindICSElements(req, res, next, ics, childs, tempArr);
     response += returned;
 
     response += "			</prop>";
     response += "			<status>HTTP/1.1 200 OK</status>";
     response += "		</propstat>";
-    for(var j=0;j<tempArr.length;j++){
+    for(let j=0;j<tempArr.length;j++){
         response +=`<propstat>`
         response +=`<prop>`
         response +=`<${tempArr[j]}/>`
@@ -578,8 +538,8 @@ function returnICSCalendar(req, res, next, ics, childs){
 }
 
 function returnCalendar(req, res, next, calendar, childs, isRoot ){
-    var response = "";
-    var username = res.locals.username;
+    let response = "";
+    let username = res.locals.username;
 
     if(typeof isRoot == "undefined"){
         isRoot = false;
@@ -590,16 +550,16 @@ function returnCalendar(req, res, next, calendar, childs, isRoot ){
     response += "		<propstat>";
     response += "			<prop>";
 
-    var tempArr = [];
+    let tempArr = [];
 
-    var returned = returnPropfindElements(req, res, next, calendar, childs, isRoot, tempArr);
+    let returned = returnPropfindElements(req, res, next, calendar, childs, isRoot, tempArr);
     response += returned;
 
     response += "			</prop>";
     response += "			<status>HTTP/1.1 200 OK</status>";
     response += "		</propstat>";
     if(isRoot == true){
-        for(var j=0;j<tempArr.length;j++){
+        for(let j=0;j<tempArr.length;j++){
             response +=`<propstat>`
             response +=`<prop>`
             response +=`<${tempArr[j]}/>`
@@ -614,7 +574,7 @@ function returnCalendar(req, res, next, calendar, childs, isRoot ){
 }
 
 function getSupportedReportSet(isRoot){
-    var response = "";
+    let response = "";
 
     response += "<supported-report-set>";
 
@@ -634,7 +594,7 @@ function getSupportedReportSet(isRoot){
 }
 
 function getCurrentUserPrivilegeSet(){
-    var response = "";
+    let response = "";
 
     response += "<current-user-privilege-set>";
     response += "<privilege xmlns=\"DAV:\"><C:read-free-busy/></privilege>";
@@ -654,8 +614,8 @@ function getCurrentUserPrivilegeSet(){
 }
 
 function getACL(req, res, next){
-    var username = res.locals.username;
-    var response = "";
+    let username = res.locals.username;
+    let response = "";
 
     response += "<acl>";
     response += "    <ace>";
@@ -703,17 +663,21 @@ function getACL(req, res, next){
     return response;
 }
 
+// Warning:
+//      MKCALENDAR has not be used since express do not support MKCALENDAR.
+//      moreover,node.js less than 4.X do not support MKCALENDAR,too.
+//      Therefore, we decide to make calendar if there isn't to skip MKCALENDAR
 async function handleMkcalendar(req, res, next){
     log.debug("calendar.makeCalendar called");
 
-    var response = "";
+    let response = "";
 
     helper.setStandardHeaders(res);
 
-    var body = req.rawBody;
-    var xmlDoc = xml.parseXml(body);
+    let body = req.rawBody;
+    let xmlDoc = xml.parseXml(body);
 
-    var node = xmlDoc.get('/B:mkcalendar/A:set/A:prop', {
+    let node = xmlDoc.get('/B:mkcalendar/A:set/A:prop', {
         A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
@@ -721,20 +685,20 @@ async function handleMkcalendar(req, res, next){
         E: "http://me.com/_namespace/"
     });
 
-    var childs = node.childNodes();
+    let childs = node.childNodes();
 
-    var timezone,
+    let timezone,
     order,
     free_busy_set,
     supported_cal_component,
     colour,
     displayname;
 
-    var len = childs.length;
+    let len = childs.length;
     if(len > 0){
-        for (var i=0; i < len; ++i){
-            var child = childs[i];
-            var name = child.name();
+        for (let i=0; i < len; ++i){
+            let child = childs[i];
+            let name = child.name();
             switch(name){
                 case 'calendar-color':
                     colour = child.text();
@@ -771,9 +735,9 @@ async function handleMkcalendar(req, res, next){
             colour = "#0E61B9FF"; 
         }
 
-        var filename = res.locals.ics_id;
+        let filename = res.locals.ics_id;
 
-        var defaults = {
+        let defaults = {
             owner: res.locals.username,
             timezone: timezone,
             order: order,
@@ -812,12 +776,12 @@ async function handleReport(req, res, next){
     res.writeHead(207);
     res.write(helper.getXMLHead());
 
-    var body = req.rawBody;
-    var xmlDoc = xml.parseXml(body);
+    let body = req.rawBody;
+    let xmlDoc = xml.parseXml(body);
 
-    var rootNode = xmlDoc.root();
+    let rootNode = xmlDoc.root();
 
-    var name = rootNode.name();
+    let name = rootNode.name();
     switch(name){
         case 'sync-collection':
             await handleReportSyncCollection(req,res,next);
@@ -840,15 +804,15 @@ async function handleReport(req, res, next){
 
 async function handleReportCalendarQuery(req, res, next){
 
-    var calendarId = req.params.calendar_id;
+    let calendarId = req.params.calendar_id;
 
     let cal = await CAL.find({ where: {pkey: calendarId} } );
     
     let result = await ICS.findAndCountAll({ where: {calendarId: calendarId}});
-    var body = req.rawBody;
-    var xmlDoc = xml.parseXml(body);
+    let body = req.rawBody;
+    let xmlDoc = xml.parseXml(body);
 
-    var nodeProp = xmlDoc.get('/B:calendar-query/A:prop', {
+    let nodeProp = xmlDoc.get('/B:calendar-query/A:prop', {
         A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
@@ -856,7 +820,7 @@ async function handleReportCalendarQuery(req, res, next){
         E: "http://me.com/_namespace/"
     });
 
-    var nodeFilter = xmlDoc.get('/B:filter', {
+    let nodeFilter = xmlDoc.get('/B:filter', {
         A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
@@ -864,23 +828,23 @@ async function handleReportCalendarQuery(req, res, next){
         E: "http://me.com/_namespace/"
     });
 
-    var response = "";
+    let response = "";
 
-    var nodeProps = nodeProp.childNodes();
-    var len = nodeProps.length;
+    let nodeProps = nodeProp.childNodes();
+    let len = nodeProps.length;
 
-    for (var j=0; j < result.count; ++j){
-        var ics = result.rows[j];
+    for (let j=0; j < result.count; ++j){
+        let ics = result.rows[j];
 
         response += "<response><href>" + mountedPath.calDavPath +"/"+ res.locals.username+"/"+res.locals.calendar_id+"/" + "</href>";
         response += "<propstat>";
         response += "<prop>";
 
-        var date = Date.parse(ics.updatedAt);
+        let date = Date.parse(ics.updatedAt);
 
-        for (var i=0; i < len; ++i){
-            var child = nodeProps[i];
-            var name = child.name();
+        for (let i=0; i < len; ++i){
+            let child = nodeProps[i];
+            let name = child.name();
             switch(name){
                 case 'getetag':
                     response += "<getetag>\"" + ics.pkey + "-"+ Number(date) + "\"</getetag>";
@@ -914,10 +878,10 @@ async function handleReportCalendarQuery(req, res, next){
 }
 
 async function handleReportSyncCollection(req, res, next){
-    var body = req.rawBody;
-    var xmlDoc = xml.parseXml(body);
+    let body = req.rawBody;
+    let xmlDoc = xml.parseXml(body);
 
-    var node = xmlDoc.get('/A:sync-collection', {
+    let node = xmlDoc.get('/A:sync-collection', {
         A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
@@ -926,22 +890,22 @@ async function handleReportSyncCollection(req, res, next){
     });
 
     if(node != undefined){
-        var calendarId = res.locals.calendar_id;
+        let calendarId = res.locals.calendar_id;
 
         let cal = await CAL.find({ where: {pkey: calendarId} } );
 
         let result = await ICS.findAndCountAll({ where: {calendarId: calendarId}});
-        var response = "";
+        let response = "";
 
-        for (var j=0; j < result.count; ++j){
-            var ics = result.rows[j];
+        for (let j=0; j < result.count; ++j){
+            let ics = result.rows[j];
 
-            var childs = node.childNodes();
+            let childs = node.childNodes();
 
-            var len = childs.length;
-            for (var i=0; i < len; ++i){
-                var child = childs[i];
-                var name = child.name();
+            let len = childs.length;
+            for (let i=0; i < len; ++i){
+                let child = childs[i];
+                let name = child.name();
                 switch(name){
                     case 'sync-token':
                         break;
@@ -972,20 +936,20 @@ async function handleReportSyncCollection(req, res, next){
 }
 
 function handleReportCalendarProp(req, res, next, node, cal, ics){
-    var response = "";
+    let response = "";
 
     response += "<response>";
     response += "<href>" + mountedPath.calDavPath+"/" + res.locals.username +"/"+res.locals.calendar_id + "/</href>";
     response += "<propstat><prop>";
 
-    var childs = node.childNodes();
+    let childs = node.childNodes();
 
-    var date = Date.parse(ics.updatedAt);
+    let date = Date.parse(ics.updatedAt);
 
-    var len = childs.length;
-    for (var i=0; i < len; ++i){
-        var child = childs[i];
-        var name = child.name();
+    let len = childs.length;
+    for (let i=0; i < len; ++i){
+        let child = childs[i];
+        let name = child.name();
         switch(name){
             case 'getetag':
                 response += "<getetag>\"" + ics.pkey + "-" + Number(date) + "\"</getetag>";
@@ -1011,10 +975,10 @@ function handleReportCalendarProp(req, res, next, node, cal, ics){
 }
 
 async function handleReportCalendarMultiget(req,res,next){
-    var body = req.rawBody;
-    var xmlDoc = xml.parseXml(body);
+    let body = req.rawBody;
+    let xmlDoc = xml.parseXml(body);
 
-    var node = xmlDoc.get('/B:calendar-multiget', {
+    let node = xmlDoc.get('/B:calendar-multiget', {
         A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
@@ -1023,14 +987,14 @@ async function handleReportCalendarMultiget(req,res,next){
     });
 
     if(node != undefined){
-        var childs = node.childNodes();
+        let childs = node.childNodes();
 
-        var arrHrefs = [];
+        let arrHrefs = [];
 
-        var len = childs.length;
-        for (var i=0; i < len; ++i){
-            var child = childs[i];
-            var name = child.name();
+        let len = childs.length;
+        for (let i=0; i < len; ++i){
+            let child = childs[i];
+            let name = child.name();
             switch(name){
                 case 'prop': // TODO: theoretically we should first get the parameters ordered by the client, lets do so later :)
                     break;
@@ -1050,22 +1014,24 @@ async function handleReportCalendarMultiget(req,res,next){
 }
 
 function parseHrefToIcsId(href){
-    var e = href.split("/");
-    var id = e[e.length - 1];
+    let e = href.split("/");
+    let id = e[e.length - 1];
 
     return id.split('.')[0];
 }
 
 async function handleReportHrefs(req, res, next, arrIcsIds){
+    arrIcsIds = arrIcsIds.map(item=>decodeURIComponent(item));
     log.debug(`ics ids wait to found: ${arrIcsIds}`);
-    let result = await ICS.findAndCountAll( { where: {pkey: arrIcsIds}})
-    var response = "";
+    let result = await ICS.findAndCountAll( { where: {pkey: arrIcsIds}});
+
+    let response = "";
     log.debug(`found ics total:${result.count}`);
 
-    for (var i=0; i < result.count; ++i){
-        var ics = result.rows[i];
+    for (let i=0; i < result.count; ++i){
+        let ics = result.rows[i];
 
-        var date = Date.parse(ics.updatedAt);
+        let date = Date.parse(ics.updatedAt);
 
         response += "<response>";
         response += "<href>" + mountedPath.calDavPath + "/"+ res.locals.username+"/"+res.locals.calendar_id+"/" + ics.pkey + ".ics</href>";
@@ -1093,42 +1059,42 @@ async function handleProppatch(req,res,next){
 
     res.write(helper.getXMLHead());
 
-    var body = req.rawBody;
-    var xmlDoc = xml.parseXml(body);
+    let body = req.rawBody;
+    let xmlDoc = xml.parseXml(body);
 
-    var node = xmlDoc.get('/A:propertyupdate/A:set/A:prop', {
+    let node = xmlDoc.get('/A:propertyupdate/A:set/A:prop', {
         A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
         D: "http://apple.com/ns/ical/",
         E: "http://me.com/_namespace/"
     });
-    var childs = node.childNodes();
+    let childs = node.childNodes();
 
-    var isRoot = true;
+    let isRoot = true;
 
     // if URL element size === 3, this is a call for the root URL of a user.
     // TODO:
 
     if(req.url.split("/").length > 3){
-        var lastPathElement = req.params.ics_id;
+        let lastPathElement = req.params.ics_id;
         if(helper.stringEndsWith(lastPathElement,'.ics')){
             isRoot = false;
         }
     }
 
-    var response = "";
+    let response = "";
 
     if(isRoot){
-        var calendarId = res.locals.calendar_id;
+        let calendarId = res.locals.calendar_id;
         let cal = await CAL.find({ where: {pkey: calendarId} });
         if(!cal){
             log.warn('Calendar not found');
 
-            var len = childs.length;
-            for (var i=0; i < len; ++i){
-                var child = childs[i];
-                var name = child.name();
+            let len = childs.length;
+            for (let i=0; i < len; ++i){
+                let child = childs[i];
+                let name = child.name();
                 switch(name){
                     case 'default-alarm-vevent-date':
                         response += "<C:default-alarm-vevent-date/>";
@@ -1159,10 +1125,10 @@ async function handleProppatch(req,res,next){
             res.write("	</response>\r\n");
             res.write("</multistatus>\r\n");
         }else{
-            var len = childs.length;
-            for (var i=0; i < len; ++i){
-                var child = childs[i];
-                var name = child.name();
+            let len = childs.length;
+            for (let i=0; i < len; ++i){
+                let child = childs[i];
+                let name = child.name();
                 switch(name){
                     case 'default-alarm-vevent-date':
                         response += "<C:default-alarm-vevent-date/>";
@@ -1226,9 +1192,9 @@ async function handleProppatch(req,res,next){
 }
 
 function returnOutbox(req,res,next){
-    var response = "";
+    let response = "";
 
-    var username = res.locals.username
+    let username = res.locals.username
 
     response += "<response>";
     response += "   <href>" + mountedPath.calDavPath+"/" + username + "/outbox/</href>";
@@ -1284,9 +1250,9 @@ function returnOutbox(req,res,next){
 }
 
 function returnNotifications(req,res,next){
-    var response = "";
+    let response = "";
 
-    var username = res.locals.username;
+    let username = res.locals.username;
 
     response += "<response>";
     response += "<href>" + mountedPath.calDavPath + "/" + username + "/notifications/</href>";
@@ -1356,8 +1322,9 @@ function returnNotifications(req,res,next){
     return response;
 }
 
+// caldav client will call OPTIONS request to get the server info 
 function handleOptions(req,res,next){
-    log.debug("principal.options called");
+    log.debug("calendar.options called");
 
     helper.setStandardHeaders(res);
     helper.setDAVHeaders(res);
@@ -1365,13 +1332,15 @@ function handleOptions(req,res,next){
     res.status(200).end();
 }
 
+// caldav client will call PUT request to add/update VEVENT and etc
+// statusCode must be 201, otherwise it will be rejected by client
 async function handlePut(req,res,next){
     log.debug("calendar.put called");
 
-    var calendar_id = res.locals.calendar_id;
-    var ics_id = res.locals.ics_id;
+    let calendar_id = res.locals.calendar_id;
+    let ics_id = res.locals.ics_id;
 
-    var defaults = {
+    let defaults = {
         calendarId: calendar_id,
         content: req.rawBody,
     };
@@ -1387,8 +1356,8 @@ async function handlePut(req,res,next){
 
     helper.setStandardHeaders(res);
 
-    var date = ics.updatedAt;
-    var etag = Number(Date.parse(date));
+    let date = ics.updatedAt;
+    let etag = Number(Date.parse(date));
     res.set("ETag", etag);
 
     res.status(201).end();
@@ -1409,7 +1378,7 @@ async function handleGet(req,res,next){
 
     res.set("Content-Type", "text/calendar");
 
-    var ics_id = res.locals.ics_id;
+    let ics_id = res.locals.ics_id;
 
     let ics = await ICS.find( { where: {pkey: ics_id}});
 
@@ -1417,7 +1386,7 @@ async function handleGet(req,res,next){
         log.warn('calendar GET err: could not find ics');
     }else{
         log.warn('calendar GET ok')
-        var content = ics.content;
+        let content = ics.content;
         res.write(content);
     }
     
@@ -1431,11 +1400,11 @@ async function handleDelete(req,res,next){
     res.set("Content-Type", "text/html");
     res.set("Server", "Caldav");
 
-    var isRoot = true;
+    let isRoot = true;
 
     // if URL element size === 3, this is a call for the root URL of a user.
     if(req.url.split("/").length > 3){
-        var lastPathElement = req.params.ics_id;
+        let lastPathElement = req.params.ics_id;
         if(helper.stringEndsWith(lastPathElement,'.ics')){
             isRoot = false;
         }
@@ -1483,13 +1452,13 @@ async function handleMove(req,res,next){
 
     helper.setStandardHeaders(res);
 
-    var ics_id = res.locals.ics_id;
-    var calendar_id = res.locals.calendar_id;
-    var destination = "";
+    let ics_id = res.locals.ics_id;
+    let calendar_id = res.locals.calendar_id;
+    let destination = "";
 
-    var headers = req.headers;
+    let headers = req.headers;
 
-    for(var header in headers){
+    for(let header in headers){
         if(header === "destination"){
             destination = req.headers[header];
         }
@@ -1504,8 +1473,8 @@ async function handleMove(req,res,next){
 
     if(destination.length > 0){
 
-        var aURL = destination.split("/");
-        var newCal = aURL[aURL.length - 2];
+        let aURL = destination.split("/");
+        let newCal = aURL[aURL.length - 2];
         newCal = newCal.split('.')[0]
 
         let ics = await ICS.find({ where: {pkey: ics_id} });

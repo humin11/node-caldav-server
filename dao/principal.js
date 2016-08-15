@@ -21,27 +21,27 @@ function handlePropfind(req,res,next){
     
     res.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
 
-    var body = req.rawBody;
+    let body = req.rawBody;
 
     log.debug(body);
 
-    var xmlDoc = xml.parseXml(body);
+    let xmlDoc = xml.parseXml(body);
 
-    var node = xmlDoc.get('/A:propfind/A:prop', {
+    let node = xmlDoc.get('/A:propfind/A:prop', {
         A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
         D: "http://apple.com/ns/ical/",
         E: "http://me.com/_namespace/"
     });
-    var childs = node.childNodes();
+    let childs = node.childNodes();
 
-    var response = "";
+    let response = "";
 
-    var len = childs.length;
-    for (var i=0; i < len; ++i){
-        var child = childs[i];
-        var name = child.name();
+    let len = childs.length;
+    for (let i=0; i < len; ++i){
+        let child = childs[i];
+        let name = child.name();
         switch(name){
             case 'checksum-versions':
                 response += "";
@@ -127,7 +127,7 @@ function handlePropfind(req,res,next){
 }
 
 function getSupportedReportSet(req,res,next){
-    var response = "";
+    let response = "";
     response += "        <d:supported-report-set>\r\n";
     response += "        	<d:supported-report>\r\n";
     response += "        		<d:report>\r\n";
@@ -150,7 +150,7 @@ function getSupportedReportSet(req,res,next){
 }
 
 function getCalendarUserAddressSet(req){
-    var response = "";
+    let response = "";
 
     response += "        <cal:calendar-user-address-set>\r\n";
     response += "        	<d:href>mailto:lord test at swordlord.com</d:href>\r\n";
@@ -167,14 +167,14 @@ function handleReport(req,res,next){
 
     res.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
 
-    var body = req.rawBody;
+    let body = req.rawBody;
 
     log.debug(body);
 
-    var xmlDoc = xml.parseXml(body);
+    let xmlDoc = xml.parseXml(body);
 
 
-    var node = xmlDoc.get('/A:propfind/A:prop', {
+    let node = xmlDoc.get('/A:propfind/A:prop', {
         A: 'DAV:',
         B: "urn:ietf:params:xml:ns:caldav",
         C: 'http://calendarserver.org/ns/',
@@ -182,17 +182,17 @@ function handleReport(req,res,next){
         E: "http://me.com/_namespace/"
     });
 
-    var response = "";
+    let response = "";
 
     log.debug('here2');
 
     if(node != undefined){
-        var childs = node.childNodes();
+        let childs = node.childNodes();
 
-        var len = childs.length;
-        for (var i=0; i < len; ++i){
-            var child = childs[i];
-            var name = child.name();
+        let len = childs.length;
+        for (let i=0; i < len; ++i){
+            let child = childs[i];
+            let name = child.name();
             switch(name){
                 case 'principal-search-property-set':
                     response += getPrincipalSearchPropertySet(req,res,next);
@@ -216,7 +216,7 @@ function handleReport(req,res,next){
     });
 
     if(node != undefined){
-        var name = node.name();
+        let name = node.name();
         switch(name){
             case 'principal-search-property-set':
                 response += getPrincipalSearchPropertySet(req,res,next);
@@ -240,16 +240,16 @@ function handleReport(req,res,next){
 }
 
 function isReportPropertyCalendarProxyWriteFor(request){
-    var body = request.rawBody;
-    var xmlDoc = xml.parseXml(body);
+    let body = request.rawBody;
+    let xmlDoc = xml.parseXml(body);
 
-    var node = xmlDoc.get('/A:expand-property/A:property[@name=\'calendar-proxy-write-for\']', { A: 'DAV:', C: 'http://calendarserver.org/ns/'});
+    let node = xmlDoc.get('/A:expand-property/A:property[@name=\'calendar-proxy-write-for\']', { A: 'DAV:', C: 'http://calendarserver.org/ns/'});
 
     return typeof node != 'undefined';
 }
 
 function replyPropertyCalendarProxyWriteFor(req,res,next){
-    var body = req.rawBody;
+    let body = req.rawBody;
     res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">\r\n");
     res.write("<d:response>");
     res.write("    <d:href>" + url + "</d:href>");
@@ -265,7 +265,7 @@ function replyPropertyCalendarProxyWriteFor(req,res,next){
 }
 
 function getPrincipalSearchPropertySet(req,res,next){
-    var response = "";
+    let response = "";
     response += "<d:principal-search-property-set xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">\r\n";
     response += "  <d:principal-search-property>\r\n";
     response += "    <d:prop>\r\n";
@@ -291,7 +291,7 @@ function handleProppatch(req,res,next){
     res.set("Content-Type", "application/xml; charset=utf-8");
     res.set("Server", "Caldav");
 
-    var url = req.originalUrl;
+    let url = req.originalUrl;
 
     res.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
     res.write("<d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">\r\n");

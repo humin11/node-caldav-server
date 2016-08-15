@@ -1,8 +1,8 @@
 import { USER,ICS,CAL } from './db'
 import log from '../utils/log'
-import helper from '../conf/caldavHelper'
+import helper from '../utils/caldavHelper'
 import xml from 'libxmljs'
-import { mountedPath } from '../conf/path';
+import { mountedPath } from '../conf/config';
 
 export default {
     handlePropfind,
@@ -102,7 +102,7 @@ async function handlePropfind(req, res, next){
 
         if(nodeChecksum !== undefined){
             response += "<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">";
-            response += "<response><href>" + mountedPath + "/"+ username+"/" + calendar_id+"/" + "</href></response>";
+            response += "<response><href>" + mountedPath.calDavPath + "/"+ username+"/" + calendar_id+"/" + "</href></response>";
             response += "</multistatus>";
             res.write(response);
             log.debug(`1response:`)
@@ -144,7 +144,7 @@ async function handlePropfind(req, res, next){
         if(calendar_id === "notifications"){
 
             res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\">");
-            res.write("<response><href>" + mountedPath + "/"+ username+"/"+calendar_id+"/" + "</href>");
+            res.write("<response><href>" + mountedPath.calDavPath + "/"+ username+"/"+calendar_id+"/" + "</href>");
             res.write("</response>");
             res.write("</multistatus>");
             res.end();
@@ -386,7 +386,7 @@ function returnPropfindElements(req, res, next, calendar, childs, isRoot, tempAr
                 break;
 
             case 'pre-publish-url':
-                response += "<CS:pre-publish-url><href>https://127.0.0.1:9876" + mountedPath+"/" + username + "/" + calendar.pkey + "</href></CS:pre-publish-url>";
+                response += "<CS:pre-publish-url><href>https://127.0.0.1:9876" + mountedPath.calDavPath+"/" + username + "/" + calendar.pkey + "</href></CS:pre-publish-url>";
                 break;
 
             case 'publish-url':
@@ -552,7 +552,7 @@ function returnICSCalendar(req, res, next, ics, childs){
     var username = res.locals.username;
 
     response += "	<response>";
-    response += "		<href>" + mountedPath+"/" + username + "/" + ics.calendarId + "/" + ics.pkey + ".ics</href>";
+    response += "		<href>" + mountedPath.calDavPath+"/" + username + "/" + ics.calendarId + "/" + ics.pkey + ".ics</href>";
     response += "		<propstat>";
     response += "			<prop>";
 
@@ -586,7 +586,7 @@ function returnCalendar(req, res, next, calendar, childs, isRoot ){
     }
 
     response += "	<response>";
-    response += "		<href>" + mountedPath+"/" + username + "/" + calendar.pkey + "/</href>";
+    response += "		<href>" + mountedPath.calDavPath+"/" + username + "/" + calendar.pkey + "/</href>";
     response += "		<propstat>";
     response += "			<prop>";
 
@@ -872,7 +872,7 @@ async function handleReportCalendarQuery(req, res, next){
     for (var j=0; j < result.count; ++j){
         var ics = result.rows[j];
 
-        response += "<response><href>" + mountedPath +"/"+ res.locals.username+"/"+res.locals.calendar_id+"/" + "</href>";
+        response += "<response><href>" + mountedPath.calDavPath +"/"+ res.locals.username+"/"+res.locals.calendar_id+"/" + "</href>";
         response += "<propstat>";
         response += "<prop>";
 
@@ -975,7 +975,7 @@ function handleReportCalendarProp(req, res, next, node, cal, ics){
     var response = "";
 
     response += "<response>";
-    response += "<href>" + mountedPath+"/" + res.locals.username +"/"+res.locals.calendar_id + "/</href>";
+    response += "<href>" + mountedPath.calDavPath+"/" + res.locals.username +"/"+res.locals.calendar_id + "/</href>";
     response += "<propstat><prop>";
 
     var childs = node.childNodes();
@@ -1068,7 +1068,7 @@ async function handleReportHrefs(req, res, next, arrIcsIds){
         var date = Date.parse(ics.updatedAt);
 
         response += "<response>";
-        response += "<href>" + mountedPath + "/"+ res.locals.username+"/"+res.locals.calendar_id+"/" + ics.pkey + ".ics</href>";
+        response += "<href>" + mountedPath.calDavPath + "/"+ res.locals.username+"/"+res.locals.calendar_id+"/" + ics.pkey + ".ics</href>";
         response += "<propstat><prop>";
         response += "<getetag>\"" + Number(date) + "\"</getetag>";
         response += "<C:calendar-data>" + ics.content + "</C:calendar-data>";
@@ -1149,7 +1149,7 @@ async function handleProppatch(req,res,next){
 
             res.write("<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CS=\"http://calendarserver.org/ns/\" xmlns:ical=\"http://apple.com/ns/ical/\">\r\n");
             res.write("	<response>\r\n");
-            res.write("		<href>" + mountedPath+"/" + res.locals.username+"/" + res.locals.calendar_id + "/</href>\r\n");
+            res.write("		<href>" + mountedPath.calDavPath+"/" + res.locals.username+"/" + res.locals.calendar_id + "/</href>\r\n");
             res.write("		<propstat>\r\n");
             res.write("			<prop>\r\n");
             res.write(response);
@@ -1231,7 +1231,7 @@ function returnOutbox(req,res,next){
     var username = res.locals.username
 
     response += "<response>";
-    response += "   <href>" + mountedPath+"/" + username + "/outbox/</href>";
+    response += "   <href>" + mountedPath.calDavPath+"/" + username + "/outbox/</href>";
     response += "    <propstat>";
     response += "        <prop>";
     response += "            <current-user-privilege-set>";
@@ -1289,7 +1289,7 @@ function returnNotifications(req,res,next){
     var username = res.locals.username;
 
     response += "<response>";
-    response += "<href>" + mountedPath + "/" + username + "/notifications/</href>";
+    response += "<href>" + mountedPath.calDavPath + "/" + username + "/notifications/</href>";
     response += "<propstat>";
     response += "    <prop>";
     response += "        <current-user-privilege-set>";
@@ -1466,7 +1466,7 @@ async function handleDelete(req,res,next){
 
         let ics_id = res.locals.ics_id;
         let ics = await ICS.find( { where: {pkey: ics_id}});
-        if(ics === null){
+        if(!ics){
             log.warn('err: could not find ics');
         }else{
             ics.destroy().then(function(){
@@ -1509,7 +1509,7 @@ async function handleMove(req,res,next){
         newCal = newCal.split('.')[0]
 
         let ics = await ICS.find({ where: {pkey: ics_id} });
-        if(ics === null){
+        if(!ics){
             log.warn('ics not found');
         }else{
             ics.calendarId = newCal;

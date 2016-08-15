@@ -17,12 +17,10 @@
     "debug": "~2.2.0",
     "express": "~4.13.4",
     "http-auth": "^2.4.4",
-    "jade": "~1.11.0",
     "libxmljs": "^0.18.0",
     "log4js": "^0.6.38",
     "morgan": "~1.7.0",
     "sequelize": "^3.23.6",
-    "serve-favicon": "~2.3.0",
     "sqlite3": "^3.1.4"
   },
   "devDependencies": {

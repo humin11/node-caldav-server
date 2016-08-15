@@ -1,7 +1,8 @@
 import db from './db';
 import log from '../utils/log'
 import xml from 'libxmljs'
-import helper from '../conf/caldavHelper'
+import helper from '../utils/caldavHelper'
+import { mountedPath } from '../conf/config';
 
 export default {
     handlePropfind,
@@ -15,6 +16,8 @@ function handlePropfind(req,res,next){
 
     helper.setStandardHeaders(res);
     helper.setDAVHeaders(res);
+
+    res.writeHead(207);
     
     res.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
 
@@ -36,12 +39,10 @@ function handlePropfind(req,res,next){
     var response = "";
 
     var len = childs.length;
-    for (var i=0; i < len; ++i)
-    {
+    for (var i=0; i < len; ++i){
         var child = childs[i];
         var name = child.name();
-        switch(name)
-        {
+        switch(name){
             case 'checksum-versions':
                 response += "";
                 break;
@@ -55,7 +56,8 @@ function handlePropfind(req,res,next){
                 break;
 
             case 'principal-URL':
-                response += "<d:principal-URL><d:href>/p/" + req.user + "/</d:href></d:principal-URL>\r\n";
+            
+                response += "<d:principal-URL><d:href>" + mountedPath.principalPath + "/" + req.user + "/</d:href></d:principal-URL>\r\n";
                 break;
 
             case 'displayname':
@@ -63,19 +65,19 @@ function handlePropfind(req,res,next){
                 break;
 
             case 'principal-collection-set':
-                response += "<d:principal-collection-set><d:href>/p/</d:href></d:principal-collection-set>";
+                response += "<d:principal-collection-set><d:href>" + mountedPath.principalPath +"/</d:href></d:principal-collection-set>";
                 break;
 
             case 'current-user-principal':
-                response += "<d:current-user-principal><d:href>/p/" + req.user + "/</d:href></d:current-user-principal>";
+                response += "<d:current-user-principal><d:href>" + mountedPath.principalPath + "/" + req.user + "/</d:href></d:current-user-principal>";
                 break;
 
             case 'calendar-home-set':
-                response += "<cal:calendar-home-set><d:href>/cal/" + req.user + "</d:href></cal:calendar-home-set>";
+                response += "<cal:calendar-home-set><d:href>" + mountedPath.calDavPath + "/" + req.user + "</d:href></cal:calendar-home-set>";
                 break;
 
             case 'schedule-outbox-URL':
-                response += "<cal:schedule-outbox-URL><d:href>/cal/" + req.user + "/outbox</d:href></cal:schedule-outbox-URL>";
+                response += "<cal:schedule-outbox-URL><d:href>" + mountedPath.calDavPath +"/" + req.user + "/outbox</d:href></cal:schedule-outbox-URL>";
                 break;
 
             case 'calendar-user-address-set':
@@ -83,7 +85,7 @@ function handlePropfind(req,res,next){
                 break;
 
             case 'notification-URL':
-                response += "<cs:notification-URL><d:href>/cal/" + req.user + "/notifications/</d:href></cs:notification-URL>";
+                response += "<cs:notification-URL><d:href>" + mountedPath.calDavPath +"/" + req.user + "/notifications/</d:href></cs:notification-URL>";
                 break;
 
             case 'getcontenttype':
@@ -121,7 +123,7 @@ function handlePropfind(req,res,next){
     res.write("</d:propstat>");
     res.write("</d:response>");
     res.write("</d:multistatus>");
-    res.status(207).end();
+    res.end();
 }
 
 function getSupportedReportSet(req,res,next){
@@ -152,7 +154,7 @@ function getCalendarUserAddressSet(req){
 
     response += "        <cal:calendar-user-address-set>\r\n";
     response += "        	<d:href>mailto:lord test at swordlord.com</d:href>\r\n";
-    response += "        	<d:href>/p/" + req.user + "/</d:href>\r\n";
+    response += "        	<d:href>" + mountedPath.principalPath + "/" + req.user + "/</d:href>\r\n";
     response += "        </cal:calendar-user-address-set>\r\n";
 
     return response;
@@ -234,7 +236,7 @@ function handleReport(req,res,next){
         replyPropertyCalendarProxyWriteFor(req,res,next);
     }
 
-    res.status(200).end();
+    res.end();
 }
 
 function isReportPropertyCalendarProxyWriteFor(request){

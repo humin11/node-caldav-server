@@ -1,9 +1,9 @@
 import Sequelize from 'sequelize'
-import config from '../conf/db'
+import config from '../conf/config'
 import log from '../utils/log'
 
 let sequelize = new Sequelize(config.databaseName, null, null, {
-    dialect: config.databaseType,
+    dialect: config.db.databaseType,
     // logging: function(info){
     //     if(info)
     //         log.info(info);
@@ -11,7 +11,7 @@ let sequelize = new Sequelize(config.databaseName, null, null, {
     //         log.error("No info catched");
     // },
     logging: false,
-    storage: config.databaseFile
+    storage: config.db.databaseFile
 });
 
 let USER = sequelize.define('USER', {
@@ -40,7 +40,7 @@ let CAL = sequelize.define('CAL', {
 (async () => {
     try {
         await sequelize.sync({ 
-            force: config.shouldTruncateAllTables 
+            force: config.db.shouldTruncateAllTables 
         });
         log.info("database structure updated")
     } catch (err) {

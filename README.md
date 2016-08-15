@@ -104,3 +104,6 @@ SOL Calendar is an wonderful Android app , which focus on Calendar including Cal
 
 You can now add events and tasks to your calendar. 
 
+### License
+GPL v3
+

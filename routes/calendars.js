@@ -13,29 +13,31 @@ router.use('/:username?/:calendar_id?/:ics_id?', function(req,res,next){
     if(req.params.username == req.user){
       res.locals.username = req.user;
     }else{
-      // no user provided, but only provide ics_id
-      // so just apply default value to username && calendar_id
-      res.locals.username = req.user;
-      res.locals.calendar_id = req.user;
-      res.locals.ics_id = parseName(req.params.username);
 
-      console.log(`-url: ${req.url}`);
-      console.log(`-username: ${res.locals.username}`);
-      console.log(`-calendar_id: ${res.locals.calendar_id}`);
-      console.log(`-ics_id: ${res.locals.ics_id}`);
-      next();
-      return;
+      if(typeof req.params.calendar_id !="undefined"){
+        // username not equals to req.user
+        // should only read calendar
+        res.locals.username = req.params.username
+
+      }else{
+        // none user provided nor calendar_id, but only provide ics_id
+        // so just apply default value to username && calendar_id
+        res.locals.username = req.user;
+        res.locals.calendar_id = req.user;
+        res.locals.ics_id = parseName(req.params.username);
+
+        console.log(`-url: ${req.url}`);
+        console.log(`-username: ${res.locals.username}`);
+        console.log(`-calendar_id: ${res.locals.calendar_id}`);
+        console.log(`-ics_id: ${res.locals.ics_id}`);
+        next();
+        return;
+      }
     }
     
   }else{
-    res.locals.username = req.params.username;
-  }
-
-  if(typeof req.params.calendar_id != "undefined"){
-    res.locals.username = req.params.username;
-  }else{
     res.locals.username = req.user;
-  } 
+  }
 
   if(typeof req.params.calendar_id != "undefined"){
     res.locals.calendar_id = parseName(req.params.calendar_id)

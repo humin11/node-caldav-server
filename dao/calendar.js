@@ -52,11 +52,9 @@ async function handlePropfind(req, res, next){
     // otherwise only from that specific calendar
     let isRoot = true;
 
-    // if URL element size === 1, this is a call for the user.
-    
-
     log.warn(`url: ${req.url}`);
 
+    // if URL element size === 1, this is a call for the user.
     if(req.url.split("/").length > 1){
         isRoot = false;
     }else if(req.url === "/"){
@@ -127,7 +125,15 @@ async function handlePropfind(req, res, next){
 
             let result = await CAL.findAndCountAll(query);
 
-            response += getResponseFromAllCalendars(req,res,next,result,childs);
+            if(typeof req.params.calendar_id != "undefined"){
+                // if calendar_id is specific, response the calendar
+                let shouldOnlyGetDefaultCalendar = true;
+                response += getResponseFromAllCalendars(req,res,next,result,childs,shouldOnlyGetDefaultCalendar);
+            }else{
+                // if calendar_id not specific, then response all known calendars 
+                let shouldOnlyGetDefaultCalendar = false;
+                response += getResponseFromAllCalendars(req,res,next,result,childs,shouldOnlyGetDefaultCalendar);
+            }
 
             // TO-DO:
             // response += returnOutbox(req, res, next);
@@ -196,14 +202,22 @@ async function handlePropfind(req, res, next){
 
                 let result = await CAL.findAndCountAll(query);
 
-                response += getResponseFromAllCalendars(req,res,next,result,childs);
+                if(typeof req.params.calendar_id != "undefined"){
+                    // if calendar_id is specific, response the calendar
+                    let shouldOnlyGetDefaultCalendar = true;
+                    response += getResponseFromAllCalendars(req,res,next,result,childs,shouldOnlyGetDefaultCalendar);
+                }else{
+                    // if calendar_id not specific, then response all known calendars 
+                    let shouldOnlyGetDefaultCalendar = false;
+                    response += getResponseFromAllCalendars(req,res,next,result,childs,shouldOnlyGetDefaultCalendar);
+                }
 
                 // response += returnOutbox(req, res, next);
                 // response += returnNotifications(req, res, next);
 
                 response += "</multistatus>";
                 res.write(response);
-                log.error(`2response`)
+                log.error(`3response`)
                 res.end();
 
         
@@ -216,8 +230,25 @@ async function handlePropfind(req, res, next){
 
                 let result = await CAL.findAndCountAll(query);
 
-                response += getResponseFromAllCalendars(req,res,next,result,childs);
+                if(typeof req.params.calendar_id != "undefined"){
+                    // if calendar_id is specific, response the calendar
+                    let shouldOnlyGetDefaultCalendar = true;
+                    response += getResponseFromAllCalendars(req,res,next,result,childs,shouldOnlyGetDefaultCalendar);
+                }else{
+                    // if calendar_id not specific, then response all known calendars 
+                    let shouldOnlyGetDefaultCalendar = false;
+                    response += getResponseFromAllCalendars(req,res,next,result,childs,shouldOnlyGetDefaultCalendar);
+                }
 
+                // Notice:   
+                //      should return all ics response for Mozilla lightning
+                //      because Mozilla lightning needs the response ics url.
+                //      while some caldav client(SOL Caldav) will initiatively 
+                //      send a REPORT request to get ics url.
+                // Warning:
+                //      Caldav client won't delete those who have been deleted on the server.
+                //      Therefore, if something is removed on the server, it can't be synced by 
+                //      caldav client except you remove the calendar and then add as a new one
                 let resultICS = await ICS.findAndCountAll({ where: {calendarId: calendar_id}});
 
                 log.debug(calendar_id);
@@ -232,32 +263,36 @@ async function handlePropfind(req, res, next){
                         response += returnedCalendar;
                     }    
                 }
+
                 // response += returnOutbox(req, res, next);
                 // response += returnNotifications(req, res, next);
 
                 response += "</multistatus>";
                 res.write(response);
-                log.error(`0response`)
+                log.error(`4response`)
                 res.end();
             }
         }
     }
 }
 
-function getResponseFromAllCalendars(req,res,next,calendars,childs){
+function getResponseFromAllCalendars(req,res,next,calendars,childs,shouldOnlyGetDefaultCalendar){
+    log.debug(`shouldOnlyGetDefaultCalendar: ${shouldOnlyGetDefaultCalendar}`);
     let response = "";
     let calendar_id = res.locals.calendar_id;
     for (let i=0; i < calendars.count; ++i){
         let calendar = calendars.rows[i];
         if(calendar.pkey == calendar_id){
-            log.debug('found root calendar')
+            log.debug('return root calendar')
             let isRoot = true;
             let returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
             response += returnedCalendar;
         }else{
             let isRoot = false;
-            let returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
-            response += returnedCalendar;
+            if(shouldOnlyGetDefaultCalendar == false){
+                let returnedCalendar = returnCalendar(req, res, next, calendar, childs, isRoot);
+                response += returnedCalendar;
+            }
         }
     }
     return response;
@@ -295,6 +330,10 @@ function returnPropfindElements(req, res, next, calendar, childs, isRoot, tempAr
 
             case 'bulk-requests':
                 response += "";
+                break;
+
+            case 'calendar-home-set':
+                response += "<C:calendar-home-set><href>" + mountedPath.calDavPath + "/" + res.locals.username + "/" + "</href></C:calendar-home-set>"
                 break;
 
             case 'calendar-color':
@@ -664,9 +703,9 @@ function getACL(req, res, next){
 }
 
 // Warning:
-//      MKCALENDAR has not be used since express do not support MKCALENDAR.
-//      moreover,node.js less than 4.X do not support MKCALENDAR,too.
-//      Therefore, we decide to make calendar if there isn't to skip MKCALENDAR
+//      MKCALENDAR has not be used since express do not support MKCALENDAR verb.
+//      moreover,node.js less than 4.X does not support MKCALENDAR,too.
+//      Therefore, we decide to make calendar if not exists in PROPFIND handler to skip MKCALENDAR
 async function handleMkcalendar(req, res, next){
     log.debug("calendar.makeCalendar called");
 
@@ -804,7 +843,7 @@ async function handleReport(req, res, next){
 
 async function handleReportCalendarQuery(req, res, next){
 
-    let calendarId = req.params.calendar_id;
+    let calendarId = res.locals.calendar_id;
 
     let cal = await CAL.find({ where: {pkey: calendarId} } );
     
@@ -836,7 +875,8 @@ async function handleReportCalendarQuery(req, res, next){
     for (let j=0; j < result.count; ++j){
         let ics = result.rows[j];
 
-        response += "<response><href>" + mountedPath.calDavPath +"/"+ res.locals.username+"/"+res.locals.calendar_id+"/" + "</href>";
+        response += "<response><href>" + mountedPath.calDavPath +"/"+ res.locals.username+"/";
+        response += res.locals.calendar_id+"/" + ics.pkey +".ics" + "</href>";
         response += "<propstat>";
         response += "<prop>";
 

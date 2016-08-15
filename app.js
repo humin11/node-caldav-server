@@ -24,6 +24,9 @@ app.use(logger('dev'));
 app.use(bodyParser.raw({
   type: function(req){
     var contentType = req.headers['content-type'];
+    if(!contentType){
+      return false;
+    }
     var defaultParseArr = ['text/calendar'];
     var shouldParse = false;
     defaultParseArr.forEach(function(item,index){

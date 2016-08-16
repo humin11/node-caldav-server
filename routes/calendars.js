@@ -26,6 +26,7 @@ router.use('/:username?/:calendar_id?/:ics_id?', function(req,res,next){
         res.locals.calendar_id = req.user;
         res.locals.ics_id = parseName(req.params.username);
 
+        console.log('no user provided nor calendar_id');
         console.log(`-url: ${req.url}`);
         console.log(`-username: ${res.locals.username}`);
         console.log(`-calendar_id: ${res.locals.calendar_id}`);
@@ -60,36 +61,36 @@ router.use('/:username?/:calendar_id?/:ics_id?', function(req,res,next){
 
 });
 
-router.propfind('/:username?/:calendar_id?/:ics_id?', async function (req, res, next) {
-  await calendarHandler.handlePropfind(req, res, next);
+router.propfind('/:username?/:calendar_id?/:ics_id?', async function (...args) {
+  await calendarHandler.handlePropfind(...args);
 });
 
-router.proppatch('/:username/:calendar_id/:ics_id', async function (req, res, next) {
-  await calendarHandler.handleProppatch(req, res, next);
+router.proppatch('/:username/:calendar_id/:ics_id', async function (...args) {
+  await calendarHandler.handleProppatch(...args);
 });
 
-router.options('/:username/:calendar_id?/:ics_id?', function (req, res, next) {
-  calendarHandler.handleOptions(req, res, next);
+router.options('/:username/:calendar_id?/:ics_id?', function (...args) {
+  calendarHandler.handleOptions(...args);
 });
 
-router.report('/:username?/:calendar_id?/:ics_id?', async function (req, res, next) {
-  await calendarHandler.handleReport(req, res, next);
+router.report('/:username?/:calendar_id?/:ics_id?', async function (...args) {
+  await calendarHandler.handleReport(...args);
 });
 
-router.put('/:username?/:calendar_id?/:ics_id?', async function (req, res, next) {
-  await calendarHandler.handlePut(req, res, next);
+router.put('/:username?/:calendar_id?/:ics_id?', async function (...args) {
+  await calendarHandler.handlePut(...args);
 });
 
-router.get('/:username/:calendar_id/:ics_id', async function (req, res, next) {
-  await calendarHandler.handleGet(req, res, next);
+router.get('/:username/:calendar_id/:ics_id', async function (...args) {
+  await calendarHandler.handleGet(...args);
 });
 
-router.delete('/:username/:calendar_id?/:ics_id?', async function (req, res, next) {
-  await calendarHandler.handleDelete(req, res, next);
+router.delete('/:username/:calendar_id?/:ics_id?', async function (...args) {
+  await calendarHandler.handleDelete(...args);
 });
 
-router.move('/:username/:calendar_id/:ics_id?', async function (req, res, next) {
-  await calendarHandler.handlePropfind(req, res, next);
+router.move('/:username/:calendar_id/:ics_id?', async function (...args) {
+  await calendarHandler.handlePropfind(...args);
 });
 
 module.exports = router;

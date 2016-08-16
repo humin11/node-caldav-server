@@ -3,28 +3,21 @@ import handlePrincipal from '../dao/principal';
 
 let router = express.Router();
 
-router.propfind('/', function(req, res, next) {
-  handlePrincipal.handlePropfind(req, res, next);
-});
-
-router.proppatch('/', function(req, res, next) {
-  handlePrincipal.handleProppatch(req, res, next);
-});
-
-router.patch('/', function(req, res, next) {
-  handlePrincipal.handleProppatch(req, res, next);
-});
-
-router.options('/', function(req, res, next) {
-  handlePrincipal.handleOptions(req, res, next);
-});
-
-router.report('/', function(req, res, next) {
-  handlePrincipal.handleReport(req, res, next);
-});
-
-router.get('/', function(req, res, next) {
-  handlePrincipal.handleReport(req, res, next);
-});
+router.route('/')
+      .propfind(function(...args) {
+        handlePrincipal.handlePropfind(...args);
+      })
+      .proppatch(function(...args) {
+        handlePrincipal.handleProppatch(...args);
+      })
+      .options(function(...args) {
+        handlePrincipal.handleOptions(...args);
+      })
+      .report(function(...args) {
+        handlePrincipal.handleReport(...args);
+      })
+      .get(function(...args) {
+        handlePrincipal.handleReport(...args);
+      })
 
 module.exports = router;

@@ -1,25 +1,26 @@
 import log from '../utils/log'
-import obj from '../dao/db'
+import { USER } from '../dao/db'
 
 function authentication(username, password, callback) {
 
-    var USER = obj.USER;
+    (async function(){
+        try{
+            let [user,created] = await USER.findOrCreate({ 
+                where: { username:username,password:password },
+                defaults: { username:username,password:password }, 
+            });
 
-    USER.findOrCreate({ 
-        where: { username:username,password:password },
-        defaults: { username:username,password:password }, 
-    }).spread(function(user, created) {
-        if(!user) {
-            log.error(`can't find user and can't create!`);
+            if(!user) {
+                log.error(`can't find user and can't create!`);
+                callback(false);
+            }else{
+                callback(true);
+            }
+        }catch(err){
+            log.error(`connect to USER failed`);
             callback(false);
-        }else{
-            callback(true);
         }
-    }).catch(function(err){
-        log.error(err);
-        callback(false);
-    });
-
+    })();
 
 }
 

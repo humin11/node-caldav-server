@@ -702,112 +702,6 @@ function getACL(req, res, next){
     return response;
 }
 
-// Warning:
-//      MKCALENDAR has not be used since express do not support MKCALENDAR verb.
-//      moreover,node.js less than 4.X does not support MKCALENDAR,too.
-//      Therefore, we decide to make calendar if not exists in PROPFIND handler to skip MKCALENDAR
-async function handleMkcalendar(req, res, next){
-    log.debug("calendar.makeCalendar called");
-
-    let response = "";
-
-    helper.setStandardHeaders(res);
-
-    let body = req.rawBody;
-    let xmlDoc = xml.parseXml(body);
-
-    let node = xmlDoc.get('/B:mkcalendar/A:set/A:prop', {
-        A: 'DAV:',
-        B: "urn:ietf:params:xml:ns:caldav",
-        C: 'http://calendarserver.org/ns/',
-        D: "http://apple.com/ns/ical/",
-        E: "http://me.com/_namespace/"
-    });
-
-    let childs = node.childNodes();
-
-    let timezone,
-    order,
-    free_busy_set,
-    supported_cal_component,
-    colour,
-    displayname;
-
-    let len = childs.length;
-    if(len > 0){
-        for (let i=0; i < len; ++i){
-            let child = childs[i];
-            let name = child.name();
-            switch(name){
-                case 'calendar-color':
-                    colour = child.text();
-                    break;
-
-                case 'calendar-free-busy-set':
-                    free_busy_set = "YES";
-                    break;
-
-                case 'displayname':
-                    displayname = child.text();
-                    break;
-
-                case 'calendar-order':
-                    order = child.text();
-                    break;
-
-                case 'supported-calendar-component-set':
-                    supported_cal_component = "VEVENT";
-                    break;
-
-                case 'calendar-timezone':
-                    timezone = child.text();
-                    break;
-
-                default:
-                    if(name != 'text') 
-                        log.warn("CAL-Mkcalendar: not handled: " + name);
-                    break;
-            }
-        }
-
-        if(colour === undefined || colour.length === 0) { 
-            colour = "#0E61B9FF"; 
-        }
-
-        let filename = res.locals.ics_id;
-
-        let defaults = {
-            owner: res.locals.username,
-            timezone: timezone,
-            order: order,
-            free_busy_set: free_busy_set,
-            supported_cal_component: supported_cal_component,
-            colour: colour,
-            displayname: displayname
-        };
-
-        let [cal,created] = await CAL.findOrCreate({ where: {pkey: filename}, defaults: defaults });
-
-        if(created){
-            log.debug('Created CAL: ' + JSON.stringify(cal, null, 4));
-        }else{
-            log.debug('Loaded CAL: ' + JSON.stringify(cal, null, 4));
-        }
-
-        cal.save().then(function(){
-            log.warn('cal saved');
-        });
-
-        res.writeHead(201);
-        res.write(response);
-        res.end();
-    }else{
-        res.writeHead(500);
-        res.write(response);
-        res.end();
-    }
-}
-
 async function handleReport(req, res, next){
     log.debug("calendar.report called");
 
@@ -1385,6 +1279,14 @@ async function handlePut(req,res,next){
         content: req.rawBody,
     };
 
+    // check if the current user is the user requesting the resource (ACL)
+    if(req.user != req.params.username){
+        log.warn('can not put resources which not belongs to the user');
+        log.warn(`req.user: ${req.user} while req.params.username: ${req.params.username}`);
+        res.status(400).end();
+        return;
+    }
+
     let [ics,created] = await ICS.findOrCreate({ where: {pkey: ics_id}, defaults: defaults})
 
     if(created){
@@ -1453,6 +1355,7 @@ async function handleDelete(req,res,next){
     // check if the current user is the user requesting the resource (ACL)
     if(req.user != req.params.username){
         log.warn('can not delete resources which not belongs to the user');
+        log.warn(`req.user: ${req.user} while req.params.username: ${req.params.username}`);
         res.status(400).end();
         return;
     }
@@ -1507,6 +1410,7 @@ async function handleMove(req,res,next){
     // check if the current user is the user requesting the resource (ACL)
     if(req.user != req.params.username){
         log.warn('can not move resources which not belongs to the user');
+        log.warn(`req.user: ${req.user} while req.params.username: ${req.params.username}`);
         res.status(400).end();
         return;
     }
@@ -1530,5 +1434,113 @@ async function handleMove(req,res,next){
 
     res.status(201).end();
 }
+
+
+// Depressed:
+//      MKCALENDAR has not be used since express do not support MKCALENDAR verb.
+//      moreover,node.js less than 4.X does not support MKCALENDAR,too.
+//      Therefore, we decide to make calendar if not exists in PROPFIND handler to skip MKCALENDAR
+async function handleMkcalendar(req, res, next){
+    log.debug("calendar.makeCalendar called");
+
+    let response = "";
+
+    helper.setStandardHeaders(res);
+
+    let body = req.rawBody;
+    let xmlDoc = xml.parseXml(body);
+
+    let node = xmlDoc.get('/B:mkcalendar/A:set/A:prop', {
+        A: 'DAV:',
+        B: "urn:ietf:params:xml:ns:caldav",
+        C: 'http://calendarserver.org/ns/',
+        D: "http://apple.com/ns/ical/",
+        E: "http://me.com/_namespace/"
+    });
+
+    let childs = node.childNodes();
+
+    let timezone,
+    order,
+    free_busy_set,
+    supported_cal_component,
+    colour,
+    displayname;
+
+    let len = childs.length;
+    if(len > 0){
+        for (let i=0; i < len; ++i){
+            let child = childs[i];
+            let name = child.name();
+            switch(name){
+                case 'calendar-color':
+                    colour = child.text();
+                    break;
+
+                case 'calendar-free-busy-set':
+                    free_busy_set = "YES";
+                    break;
+
+                case 'displayname':
+                    displayname = child.text();
+                    break;
+
+                case 'calendar-order':
+                    order = child.text();
+                    break;
+
+                case 'supported-calendar-component-set':
+                    supported_cal_component = "VEVENT";
+                    break;
+
+                case 'calendar-timezone':
+                    timezone = child.text();
+                    break;
+
+                default:
+                    if(name != 'text') 
+                        log.warn("CAL-Mkcalendar: not handled: " + name);
+                    break;
+            }
+        }
+
+        if(colour === undefined || colour.length === 0) { 
+            colour = "#0E61B9FF"; 
+        }
+
+        let filename = res.locals.ics_id;
+
+        let defaults = {
+            owner: res.locals.username,
+            timezone: timezone,
+            order: order,
+            free_busy_set: free_busy_set,
+            supported_cal_component: supported_cal_component,
+            colour: colour,
+            displayname: displayname
+        };
+
+        let [cal,created] = await CAL.findOrCreate({ where: {pkey: filename}, defaults: defaults });
+
+        if(created){
+            log.debug('Created CAL: ' + JSON.stringify(cal, null, 4));
+        }else{
+            log.debug('Loaded CAL: ' + JSON.stringify(cal, null, 4));
+        }
+
+        cal.save().then(function(){
+            log.warn('cal saved');
+        });
+
+        res.writeHead(201);
+        res.write(response);
+        res.end();
+    }else{
+        res.writeHead(500);
+        res.write(response);
+        res.end();
+    }
+}
+
 
 

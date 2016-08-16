@@ -7,7 +7,7 @@ This is a CalDav server written by express.js with babel, using pure ES6 feature
 - offer additional APIs for microservice
 - easy to implement authentication
 - easy to migrate to any other database  
-- friendly with developer because of ES6 features thanks to babel
+- friendly with developer because of ES6/ES7 features thanks to babel
 - detailed documents for both deployment and use
 
 ## Deployment
@@ -32,7 +32,10 @@ module.exports = {
 }
 ```
 
-Feel free to modify the config, then run the following command
+Feel free to modify the config
+
+### Deploy
+Run the following command
 
 ```
 npm install

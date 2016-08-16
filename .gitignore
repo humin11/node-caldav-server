@@ -1,3 +1,5 @@
 node_modules/*
 *.log
 *.db
+jsconfig.json
+.vscode/*

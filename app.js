@@ -70,7 +70,7 @@ var authentication = require('./service/authentication');
 var basic = httpauth.basic({
         realm: "Caldav"
     }, function (username, password, callback) { 
-        authentication(username,password,callback);
+       authentication(username,password,callback);
     }
 );
 app.use(httpauth.connect(basic));

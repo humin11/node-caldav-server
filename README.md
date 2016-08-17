@@ -71,13 +71,13 @@ It won't be long, which we think is less than a month
 ### Client Being tested
 - [x] Mozilla Lightning
 - [x] SOL Calendar
+- [x] aCalendar+
 - [ ] IPHONE & IPAD Calendars
 - [ ] OSX Calendars
 - [ ] CalendarSync
 - [ ] ContactSync
 - [ ] CalDav-Sync
 - [ ] DAVdroid
-- [ ] ACAL
 
 ### Mozilla Lightning
 Mozilla Lightning is a plugin for Mozilla Thunderbird to add the CalDav support
@@ -86,9 +86,9 @@ Mozilla Lightning is a plugin for Mozilla Thunderbird to add the CalDav support
 - first window:
     - choose a calendar On the Network
 - next window:
-    - choose protocol as CalDav
+    - protocol: choose CalDav
     - location: see the Usage part
-    - disable the offline support
+    - offline support: disable it
 - final window:
     - you can set whatever you want , since settings of final window is only used by Mozzila Lightning rather than CalDav server.
 
@@ -102,10 +102,17 @@ SOL Calendar is an wonderful Android app , which focus on Calendar including Cal
 - click on Custom
 - Upcoming window:
     - CalDav Root URL: see the CalDav URL part
-    - ID, your username of account
-    - Password, your password of account
+    - ID: your username of account
+    - Password: your password of account
 
 You can now add events and tasks to your calendar. 
+
+### aCalendar+
+aCalendar+ can't add new caldav server. However it can use exist calendar added by Settings/Account/New Account. 
+
+If your platform can't add a third party CalDav Calendar, you can install SOL Calendar to complete it.
+
+After the calendar being created, aCalendar+ can identify it automatically. Feel free to add events and tasks now
 
 ### License
 GPL v3

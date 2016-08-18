@@ -73,11 +73,11 @@ It won't be long, which we think is less than a month
 - [x] SOL Calendar
 - [x] aCalendar+
 - [x] DAVdroid
+- [x] CalendarSync
+- [x] CalDav-Sync
 - [ ] IPHONE & IPAD Calendars
 - [ ] OSX Calendars
-- [ ] CalendarSync
-- [ ] ContactSync
-- [ ] CalDav-Sync
+
 
 
 ### Mozilla Lightning
@@ -88,7 +88,7 @@ Mozilla Lightning is a plugin for Mozilla Thunderbird to add the CalDav support
     - choose a calendar On the Network
 - next window:
     - protocol: choose CalDav
-    - location: see the Usage part
+    - location: >localhost:3000/cal/:user_name/:calendar_name
     - offline support: disabled
 - final window:
     - you can set whatever you want , since settings of final window is only used by Mozzila Lightning rather than CalDav server.
@@ -102,7 +102,7 @@ SOL Calendar is an wonderful Android app , which focus on Calendar including Cal
 - click on Add an account
 - click on Manual entry
 - Upcoming window:
-    - CalDav Root URL: see the CalDav URL part
+    - CalDav Root URL: >localhost:3000/cal/:user_name/:calendar_name
     - ID: your username of account
     - Password: your password of account
 
@@ -133,6 +133,46 @@ However, DAVdroid can only add calendar. You need to download OpenTasks to edit 
 The syncing process of DAVdroid may report error to you. 
 Just ignore it since DAVdroid's request isn't standard.Actually,there is no error in the saving and syncing process
 
-### License
+### CalendarSync
+CalendarSync is an Android application. 
+
+The CalDav Setting here is a little bit different from other client. Follow these steps:
+
+- click on right-top corner of app
+- click on Create new WebiCal
+- click on THE GUIDED CALDAV SETUP
+- select No, I want to set it up by myself
+- Upcoming Window:
+    - Server url: >localhost:3000/cal/:user_name/:calendar_name
+    - User name: your username of account
+    - Password: your password of account
+    - Sync only a limited time interval: disabled
+    - click on TEST CONNECTION/CONFIGURATION TO CONTINUE
+- click on SEARCH AVAILABLE CALENDARS
+- click OK
+- press on the showing calendar, then click on CONFIGURE SELECTED CALENDARS
+
+CalendarSync can only sync Calendar. It doesn't have ability to edit the events and tasks.
+
+You can add events and tasks using other client, then go back to CalendarSync to sync without errors
+
+### CalDav-Sync
+CalDav-Sync is an Android application which can add CalDav calendar. 
+
+- open application
+- choose CalDAV
+- Upcoming window:
+    - Server name or URL: >localhost:3000/cal/:user_name/:calendar_name
+    - Username: your username of account
+    - Password: your password of account
+    - click on next
+- choose at least a calendar, then click on NEXT. 
+- finally click on FINISH
+
+CalDav-Sync is the same as CalendarSync which doesn't support add/edit/delete events and tasks.
+
+You can add events and tasks using other client.
+
+## License
 GPL v3
 

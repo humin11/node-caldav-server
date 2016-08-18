@@ -1320,20 +1320,47 @@ async function handleGet(req,res,next){
 
     res.set("Content-Type", "text/calendar");
 
-    let ics_id = res.locals.ics_id;
+    console.log(req.params.ics_id)
 
-    let ics = await ICS.find( { where: {pkey: ics_id}});
+    if(req.params.ics_id){
 
-    if(!ics){
-        log.warn('calendar GET err: could not find ics');
-    }else{
-        log.warn('calendar GET ok')
-        let content = ics.content;
-        res.write(content);
+        res.writeHead(200);
+
+        let ics_id = res.locals.ics_id;
+
+        let ics = await ICS.find( { where: {pkey: ics_id}});
+
+        if(!ics){
+            log.warn('calendar GET err: could not find ics');
+        }else{
+            log.warn('calendar GET ok')
+            let content = ics.content;
+            res.write(content);
+        }
+        
+        res.end();
+
+    }else if(req.params.calendar_id){
+
+        res.writeHead(200);
+
+        let calendar_id = res.locals.calendar_id;
+
+        let cal = await CAL.find( { where: {pkey: calendar_id}});
+
+        if(!cal){
+            log.warn('calendar GET err: could not find cal');
+        }else{
+            log.warn('calendar GET ok')
+            log.debug(cal.get({
+                plain: true,
+            }));
+            let content = cal;
+            res.write(content);
+        }
+        
+        res.end();
     }
-    
-    res.status(200).end();
-
 }
 
 async function handleDelete(req,res,next){

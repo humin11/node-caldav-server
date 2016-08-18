@@ -85,7 +85,7 @@ router.put('/:username?/:calendar_id?/:ics_id?', async function (...args) {
   await calendarHandler.handlePut(...args);
 });
 
-router.get('/:username/:calendar_id/:ics_id', async function (...args) {
+router.get('/:username/:calendar_id/:ics_id?', async function (...args) {
   await calendarHandler.handleGet(...args);
 });
 

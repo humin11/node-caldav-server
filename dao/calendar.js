@@ -1508,7 +1508,7 @@ async function handleMkcalendar(req, res, next){
             colour = "#0E61B9FF"; 
         }
 
-        let filename = res.locals.ics_id;
+        let filename = res.locals.calendar_id;
 
         let defaults = {
             owner: res.locals.username,

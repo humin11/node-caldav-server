@@ -15,12 +15,12 @@ let sequelize = new Sequelize(config.databaseName, null, null, {
 });
 
 let USER = sequelize.define('USER', {
-    username: {type: Sequelize.STRING,allowNull: false},
+    username: {type: Sequelize.STRING,allowNull: false, unique: true, primaryKey: true},
     password: {type: Sequelize.STRING,allowNull: false,}
 });
 
 let ICS = sequelize.define('ICS', {
-    pkey: {type: Sequelize.STRING, allowNull: false, unique: true, primaryKey: true,},
+    pkey: {type: Sequelize.STRING, allowNull: false, unique: true, primaryKey: true},
     calendarId: {type: Sequelize.STRING,allowNull: false},
     content: {type: Sequelize.TEXT,allowNull: false,}
 });

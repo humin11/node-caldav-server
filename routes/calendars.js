@@ -73,6 +73,10 @@ router.options('/:username/:calendar_id?/:ics_id?', function (...args) {
   calendarHandler.handleOptions(...args);
 });
 
+router.mkcol('/:username/:calendar_id?/:ics_id?', async function (...args) {
+  await calendarHandler.handleMkcalendar(...args)
+});
+
 router.report('/:username?/:calendar_id?/:ics_id?', async function (...args) {
   await calendarHandler.handleReport(...args);
 });

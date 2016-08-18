@@ -72,12 +72,13 @@ It won't be long, which we think is less than a month
 - [x] Mozilla Lightning
 - [x] SOL Calendar
 - [x] aCalendar+
+- [x] DAVdroid
 - [ ] IPHONE & IPAD Calendars
 - [ ] OSX Calendars
 - [ ] CalendarSync
 - [ ] ContactSync
 - [ ] CalDav-Sync
-- [ ] DAVdroid
+
 
 ### Mozilla Lightning
 Mozilla Lightning is a plugin for Mozilla Thunderbird to add the CalDav support
@@ -98,8 +99,8 @@ You can now add events and tasks to your calendar.
 SOL Calendar is an wonderful Android app , which focus on Calendar including CalDav
 
 - open Settings
-- click on Add other calendar account
-- click on Custom
+- click on Add an account
+- click on Manual entry
 - Upcoming window:
     - CalDav Root URL: see the CalDav URL part
     - ID: your username of account
@@ -108,11 +109,24 @@ SOL Calendar is an wonderful Android app , which focus on Calendar including Cal
 You can now add events and tasks to your calendar. 
 
 ### aCalendar+
-aCalendar+ can't add new caldav server. However it can use exist calendar added by Settings/Account/New Account. 
+aCalendar+ is an Android application but can't add new CalDav server. However it can use exist calendar added by Settings/Account/New Account. 
 
-If your platform can't add a third party CalDav Calendar, you can install SOL Calendar to complete it.
+If the platform can't add a third party CalDav Calendar, you can install SOL Calendar to complete it.
 
 After the calendar being created, aCalendar+ can identify it automatically. Feel free to add events and tasks now
+
+### DAVdroid
+DAVdroid is an Android application. 
+
+- press '+' button on the right bottom corner of screen
+- choose Login in with URL and user name
+    - Base URL : >localhost:3000/cal/:user_name/:calendar_name
+        - note that: In DAVdroid, calendar_name MUST NOT have prefix or suffix like 'demo.ics'.
+    - User name: your username of account
+    - Password: your password of account
+    - Preemptive authentication: enable
+
+Now the Calendar is added. However, DAVdroid can only add calendar. You need to download OpenTasks to edit the events and tasks of calendar
 
 ### License
 GPL v3

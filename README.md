@@ -89,7 +89,7 @@ Mozilla Lightning is a plugin for Mozilla Thunderbird to add the CalDav support
 - next window:
     - protocol: choose CalDav
     - location: see the Usage part
-    - offline support: disable it
+    - offline support: disabled
 - final window:
     - you can set whatever you want , since settings of final window is only used by Mozzila Lightning rather than CalDav server.
 
@@ -124,9 +124,14 @@ DAVdroid is an Android application.
         - note that: In DAVdroid, calendar_name MUST NOT have prefix or suffix like 'demo.ics'.
     - User name: your username of account
     - Password: your password of account
-    - Preemptive authentication: enable
+    - Preemptive authentication: enabled
 
-Now the Calendar is added. However, DAVdroid can only add calendar. You need to download OpenTasks to edit the events and tasks of calendar
+Now the Calendar is added. In addition, DAVdroid can add new calendar using the same account.
+
+However, DAVdroid can only add calendar. You need to download OpenTasks to edit the events and tasks of calendar
+
+The syncing process of DAVdroid may report error to you. 
+Just ignore it since DAVdroid's request isn't standard.Actually,there is no error in the saving and syncing process
 
 ### License
 GPL v3

@@ -1345,11 +1345,10 @@ async function handleDelete(req,res,next){
     let isRoot = true;
 
     // if URL element size === 3, this is a call for the root URL of a user.
-    if(req.url.split("/").length > 3){
-        let lastPathElement = req.params.ics_id;
-        if(helper.stringEndsWith(lastPathElement,'.ics')){
-            isRoot = false;
-        }
+    if(req.params.ics_id){
+        isRoot = false;
+    }else{
+        isRoot = true;
     }
 
     // check if the current user is the user requesting the resource (ACL)
@@ -1436,6 +1435,8 @@ async function handleMove(req,res,next){
 }
 
 
+// Warning:
+//      DAVdroid will request with MKCOL rather than MKCALENDAR to create new calendars
 // Depressed:
 //      MKCALENDAR has not be used since express do not support MKCALENDAR verb.
 //      moreover,node.js less than 4.X does not support MKCALENDAR,too.
@@ -1448,6 +1449,7 @@ async function handleMkcalendar(req, res, next){
     helper.setStandardHeaders(res);
 
     let body = req.rawBody;
+
     let xmlDoc = xml.parseXml(body);
 
     let node = xmlDoc.get('/B:mkcalendar/A:set/A:prop', {
@@ -1457,8 +1459,18 @@ async function handleMkcalendar(req, res, next){
         D: "http://apple.com/ns/ical/",
         E: "http://me.com/_namespace/"
     });
+    
+    let childs;
+    if(!node){
+        let verb = Object.keys(req.body)[0];
+        childs = req.body[verb].set.prop;
+    }else{
+        childs = node.childNodes();
+    }
 
-    let childs = node.childNodes();
+    if(!childs){
+         res.status(500).end();
+    }
 
     let timezone,
     order,
@@ -1467,14 +1479,17 @@ async function handleMkcalendar(req, res, next){
     colour,
     displayname;
 
-    let len = childs.length;
-    if(len > 0){
-        for (let i=0; i < len; ++i){
-            let child = childs[i];
-            let name = child.name();
+    if(childs){
+        Object.keys(childs).forEach((item,index)=>{
+            let name = item.split(":").slice(-1)[0];
+            log.debug(name);
             switch(name){
                 case 'calendar-color':
-                    colour = child.text();
+                    if(childs[item]["_"]){
+                        order = childs[item]["_"];
+                    }else{
+                        order = childs[item];
+                    }
                     break;
 
                 case 'calendar-free-busy-set':
@@ -1482,27 +1497,27 @@ async function handleMkcalendar(req, res, next){
                     break;
 
                 case 'displayname':
-                    displayname = child.text();
+                    displayname = childs[item];
                     break;
 
                 case 'calendar-order':
-                    order = child.text();
+                    order = childs[item];
                     break;
 
                 case 'supported-calendar-component-set':
-                    supported_cal_component = "VEVENT";
+                    supported_cal_component = "VEVENT;VTODO";
                     break;
 
                 case 'calendar-timezone':
-                    timezone = child.text();
+                    timezone = childs[item];
                     break;
 
                 default:
                     if(name != 'text') 
-                        log.warn("CAL-Mkcalendar: not handled: " + name);
+                        log.warn("CAL-Mkcalendar: not handled: " + item);
                     break;
             }
-        }
+        });
 
         if(colour === undefined || colour.length === 0) { 
             colour = "#0E61B9FF"; 
@@ -1513,14 +1528,19 @@ async function handleMkcalendar(req, res, next){
         let defaults = {
             owner: res.locals.username,
             timezone: timezone,
-            order: order,
-            free_busy_set: free_busy_set,
+            order: order || "",
+            free_busy_set: free_busy_set || "NO",
             supported_cal_component: supported_cal_component,
             colour: colour,
             displayname: displayname
         };
 
-        let [cal,created] = await CAL.findOrCreate({ where: {pkey: filename}, defaults: defaults });
+        let [cal,created] = await CAL.findOrCreate({ 
+            where: {pkey: filename}, 
+            defaults: defaults 
+        });
+        
+        log.error('here1');
 
         if(created){
             log.debug('Created CAL: ' + JSON.stringify(cal, null, 4));
